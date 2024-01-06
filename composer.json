@@ -1,5 +1,6 @@
 {
   "name": "m-michalis/ajaxcatalog",
+  "type": "magento-module",
   "description": "description",
   "version": "0.1.0",
   "homepage": "https://github.com/m-michalis/ajaxcatalog",
