@@ -1,0 +1,22 @@
+{
+  "name": "m-michalis/ajaxcatalog",
+  "description": "description",
+  "version": "0.1.0",
+  "homepage": "https://github.com/m-michalis/ajaxcatalog",
+  "keywords": [
+    "openmage",
+    "ajax catalog",
+    "magento",
+    "webpack"
+  ],
+  "authors":[
+    {
+      "name":"Michalis Michalis",
+      "email":"m@internetcode.gr"
+    }
+  ],
+  "require": {
+    "php": "^7.2 || ^8.0",
+    "magento-hackathon/magento-composer-installer": "*"
+  }
+}
