@@ -165,4 +165,41 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
 
         return $handleFiles;
     }
+
+    /**
+     * Fetches hashed image url from webpack copy plugin
+     *  webpack config:
+     * new CopyPlugin({
+     *    patterns: [
+     *        {
+     *            from: "./media/**",
+     *            to: "[path][name].[contenthash][ext]"
+     *        }
+     *   ]
+     * })
+     *
+     * @param string $imagePath
+     * @return string
+     */
+    public function getImageAssetUrl(string $imagePath)
+    {
+        $assetPath = 'assets' . DS . 'media' . DS . ltrim($imagePath, '/');;
+        $reqFileInfo = pathinfo($assetPath);
+        $io = new Varien_Io_File();
+        $io->checkAndCreateFolder(Mage::getBaseDir() . DS . $reqFileInfo['dirname']);
+        $io->cd(Mage::getBaseDir() . DS . $reqFileInfo['dirname']);
+        $files = $io->ls(Varien_Io_File::GREP_FILES);
+
+        foreach ($files as $file) {
+            $servFileInfo = pathinfo($file['text']);
+            $parts = explode('.', $servFileInfo['filename']);
+
+            if ($parts[0] == $reqFileInfo['filename']) {
+                return Mage::getBaseUrl() . $reqFileInfo['dirname'] .DS. $file['text'];
+            }
+        }
+        return sprintf('https://dummyimage.com/1200x1200/FF0000/ffffff.png?text=MISSING%%20IMAGE:%s',
+            Mage::helper('core')->urlEncode($assetPath)
+        );
+    }
 }
