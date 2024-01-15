@@ -239,13 +239,16 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
         }
 
         $res = new Varien_Object([
-            'filters' => array_values($filters),
-            'state' => array_values($state)
+            'filters' => $filters,
+            'state' => $state
         ]);
         Mage::dispatchEvent('ajaxcatalog_layer_response',[
             'response' => $res
         ]);
-        return $res->getData();
+        return [
+            'filters' => array_values($res->getData('filters')),
+            'state' => array_values($res->getData('state')),
+        ];
     }
 
 
