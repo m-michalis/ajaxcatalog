@@ -204,7 +204,7 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
                     $filters[$_item->getFilter()->getRequestVar()]['title'] = $_filter->getName();
                     $filters[$_item->getFilter()->getRequestVar()]['param'] = $_item->getFilter()->getRequestVar();
                     $filters[$_item->getFilter()->getRequestVar()]['options'][] = [
-                        'label' => $_item->getLabel() . ($_filter->shouldDisplayProductCount() ? ' (' . $_item->getCount() . ')' : ''),
+                        'label' => html_entity_decode($_item->getLabel()) . ($_filter->shouldDisplayProductCount() ? ' (' . $_item->getCount() . ')' : ''),
                         'url' => $_item->getUrl(),
                         'value' => (string) $value,
                         'selected' => $_item->getIsSelected() || $value == $_filter->getRequestValue()
@@ -221,7 +221,7 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
             $state[$item->getFilter()->getRequestVar()]['title'] = $item->getFilter()->getName();
             $state[$item->getFilter()->getRequestVar()]['param'] = $item->getFilter()->getRequestVar();
             $state[$item->getFilter()->getRequestVar()]['options'][] = [
-                'label' => $item->getLabel(),
+                'label' => html_entity_decode($item->getLabel()),
                 'value' => (string) $item->getValue(),
                 'url' => $item->getRemoveUrl()
             ];
