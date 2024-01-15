@@ -225,6 +225,17 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
                 'value' => (string) $item->getValue(),
                 'url' => $item->getRemoveUrl()
             ];
+
+            /**
+             * Special handling for slider filter (ex. price) so that it doesn't show up as filter on frontend
+             * todo Mage_Catalog_Model_Resource_Product_Collection::_prepareStatisticsData()
+             * todo min/max is getting updated with current collection min/max.
+             */
+            if (isset($filters[$item->getFilter()->getRequestVar()])
+                && $filters[$item->getFilter()->getRequestVar()]['renderer'] == 'slider'
+            ) {
+                unset($filters[$item->getFilter()->getRequestVar()]);
+            }
         }
 
         $res = new Varien_Object([
