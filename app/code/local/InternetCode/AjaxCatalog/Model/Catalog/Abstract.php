@@ -240,7 +240,7 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
             if (isset($filters[$item->getFilter()->getRequestVar()])
                 && $filters[$item->getFilter()->getRequestVar()]['renderer'] == 'slider'
             ) {
-                unset($filters[$item->getFilter()->getRequestVar()]);
+                //unset($filters[$item->getFilter()->getRequestVar()]);
             }
         }
 
