@@ -58,6 +58,12 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
             $showOutOfStock = (int)Mage::app()->getRequest()->getParam('out_of_stock', 0);
             $hasStockFilter = (int)Mage::app()->getRequest()->getParam('stock', 0);
             if (!$showOutOfStock && !$hasStockFilter) {
+                if (strpos($this->_productCollection->getSelect(), 'cataloginventory_stock_status') === false) {
+                    Mage::getResourceModel('cataloginventory/stock_status')
+                        ->addStockStatusToSelect(
+                            $this->_productCollection->getSelect(), Mage::app()->getWebsite()
+                        );
+                }
                 $this->_productCollection->getSelect()->where('stock_status.qty > ?', 0);
             }
 
