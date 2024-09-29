@@ -95,7 +95,16 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
                 if ($parts[0] == 'critical' || $parts[0] == 'uncritical') {
                     $handles = self::getEntries()[$parts[1]] ?? [];
 
-                    $assetType = $parts[0] == 'critical' ? InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL : InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS;
+                    switch($parts[0]){
+                        case 'critical':
+                            $assetType =  InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL;
+                            break;
+                        case 'uncritical':
+                            $assetType =  InternetCode_AjaxCatalog_Block_Webpack::ASSET_UNCRITICAL;
+                            break;
+                        default:
+                            $assetType =  InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS;
+                    }
 
                     foreach ($handles as $handle) {
                         $handleFiles[$handle][$assetType][] = $file['text'];
@@ -112,7 +121,7 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
 
             switch ($file['filetype']) {
                 case "css":
-                    $assetType = InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL;
+                    $assetType = InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS;
                     break;
                 case "js":
                     $assetType = InternetCode_AjaxCatalog_Block_Webpack::ASSET_JS;
@@ -135,31 +144,23 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
             if ($parts[0] !== 'shared') {
                 continue;
             }
-
-            switch ($file['filetype']) {
-                case "css":
-                    $assetType = InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL;
-                    break;
-                case "js":
-                    $assetType = InternetCode_AjaxCatalog_Block_Webpack::ASSET_JS;
-                    break;
-                default:
-                    continue 2;
-            }
-
             foreach ($handleFiles as $handle => $filesByType) {
-                //always add js file
-                if ($assetType == InternetCode_AjaxCatalog_Block_Webpack::ASSET_JS) {
-                    $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_JS][] = $file['text'];
+                switch ($file['filetype']) {
+                    case "css":
+                        $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS][] = $file['text'];
+                        break;
+                    case "js":
+                        $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_JS][] = $file['text'];
+                        break;
                 }
+            }
+        }
 
-
-                //if critical and css found, do not add shared css (it is included via workflow)
-                if ($assetType == InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL
-                    && !isset($filesByType[InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS])
-                ) {
-                    $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL][] = $file['text'];
-                }
+        // set normal css for uncritical css. these will be loaded after onload
+        foreach ($handleFiles as $handle => $filesByType) {
+            if(isset($filesByType[InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL])){
+                $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_UNCRITICAL] = $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS];
+                unset($handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS]);
             }
         }
 

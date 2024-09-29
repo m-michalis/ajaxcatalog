@@ -7,16 +7,21 @@
                     <type>critical_css</type>
                 </action>
             </block>
+            <block type="ajaxcatalog/webpack" name="webpack.uncritical_css" after="-">
+                <action method="setAssetType">
+                    <type>uncritical_css</type>
+                </action>
+            </block>
+            <block type="ajaxcatalog/webpack" name="webpack.css" after="-">
+                <action method="setAssetType">
+                    <type>css</type>
+                </action>
+            </block>
         </reference>
         <reference name="before_body_end">
             <block type="ajaxcatalog/webpack" name="webpack.js" after="-">
                 <action method="setAssetType">
                     <type>js</type>
-                </action>
-            </block>
-            <block type="ajaxcatalog/webpack" name="webpack.uncritical_css" after="-">
-                <action method="setAssetType">
-                    <type>css</type>
                 </action>
             </block>
         </reference>
