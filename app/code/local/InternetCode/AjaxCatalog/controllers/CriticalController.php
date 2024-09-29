@@ -19,7 +19,7 @@ class InternetCode_AjaxCatalog_CriticalController extends Mage_Core_Controller_F
             }
             $cssFiles =[];
             foreach($handles as $handle){
-                $cssFiles = array_merge($cssFiles,$files[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL]);
+                $cssFiles = array_merge($cssFiles,$files[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS]);
             }
 
             //fetch HTML
