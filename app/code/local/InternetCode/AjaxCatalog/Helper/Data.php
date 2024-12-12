@@ -127,7 +127,7 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
                     $assetType = InternetCode_AjaxCatalog_Block_Webpack::ASSET_JS;
                     break;
                 default:
-                    continue;
+                    continue 2;
             }
 
             foreach ($handles as $handle) {
