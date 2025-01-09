@@ -27,6 +27,13 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
         return $criticalEntries;
     }
 
+    /**
+     * @param Mage_Catalog_Model_Product $_product
+     * @return null
+     */
+    public function prepareProductOutputWalker(Mage_Catalog_Model_Product $_product){
+        return $this->prepareProductOutput($_product);
+    }
 
     /**
      * @param Mage_Catalog_Model_Product $_product
