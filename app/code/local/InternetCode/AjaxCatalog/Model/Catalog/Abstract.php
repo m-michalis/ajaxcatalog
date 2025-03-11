@@ -195,7 +195,7 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
             /** @var Mage_Catalog_Model_Layer_Filter_Item $_item */
             foreach ($_filter->getItems() as $_item) {
                 if ($_item->getCount()) {
-                    $value = $_item->getOptionId();
+                    $value = $_item->getOptionId() ?? $_item->getValue();
 
                     if($_filter instanceof Mage_Catalog_Block_Layer_Filter_Attribute){
                         if($_filter->getAttributeModel()->getAttributeCode() == 'color'){
