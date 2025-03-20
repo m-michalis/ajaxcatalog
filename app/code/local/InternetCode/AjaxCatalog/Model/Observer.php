@@ -34,7 +34,7 @@ class InternetCode_AjaxCatalog_Model_Observer
         $response = $ajaxModel->getAjaxResponse();
         Mage::app()->getFrontController()->setNoRender(true);
         $this->getResponse()->setBody(Mage::helper('core')->jsonEncode($response));
-        $this->getResponse()->setHeader('content-type', 'application/json');
+        $this->getResponse()->setHeader('content-type', 'application/json',true);
         $this->getRequest()->setDispatched(true);
         Varien_Profiler::stop('PREPARE_AJAX_CATALOG');
     }

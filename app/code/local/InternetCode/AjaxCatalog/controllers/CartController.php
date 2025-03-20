@@ -8,7 +8,7 @@ class InternetCode_AjaxCatalog_CartController extends Mage_Checkout_CartControll
     {
         $this->loadLayout();
         $minicart = $this->getLayout()->getBlock('minicart_content');
-        $this->getResponse()->setHeader('Content-type', 'application/json');
+        $this->getResponse()->setHeader('Content-type', 'application/json',true);
         $this->getResponse()->setBody(json_encode([
             'content' => $minicart->toHtml(),
             'count' => $minicart->getSummaryCount()
@@ -90,7 +90,7 @@ class InternetCode_AjaxCatalog_CartController extends Mage_Checkout_CartControll
         }
 
 
-        $this->getResponse()->setHeader('Content-type', 'application/json');
+        $this->getResponse()->setHeader('Content-type', 'application/json',true);
         $this->getResponse()->setBody(Mage::helper('core')->jsonEncode($result));
     }
 }
