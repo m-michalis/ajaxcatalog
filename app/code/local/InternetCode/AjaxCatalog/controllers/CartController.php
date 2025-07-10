@@ -34,6 +34,7 @@ class InternetCode_AjaxCatalog_CartController extends Mage_Checkout_CartControll
             }
 
             $product = $this->_initProduct();
+            $related = $this->getRequest()->getParam('related_product');
             if (!$product) {
                 Mage::throwException('Product not found');
             }
@@ -53,6 +54,9 @@ class InternetCode_AjaxCatalog_CartController extends Mage_Checkout_CartControll
 
 
             $cart->addProduct($product, $params);
+            if (!empty($related)) {
+                $cart->addProductsByIds(explode(',', $related));
+            }
             $cart->save();
 
             $this->_getSession()->setCartWasUpdated(true);
