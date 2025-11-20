@@ -202,7 +202,7 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
             $servFileInfo = pathinfo($file['text']);
             $parts = explode('.', $servFileInfo['filename']);
 
-            if ($parts[0] == $reqFileInfo['filename']) {
+            if ($parts[0] == $reqFileInfo['filename'] && $reqFileInfo['extension'] == $servFileInfo['extension']) {
                 return Mage::getBaseUrl() . $reqFileInfo['dirname'] .DS. $file['text'];
             }
         }
