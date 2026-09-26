@@ -10,7 +10,10 @@ class InternetCode_AjaxCatalog_Model_Catalogsearch_Result_Index extends Internet
 
     public function prepareNormalView()
     {
-        $this->getLayout()->getBlock('search.result')->unsetChildren();
+        $block = $this->getLayout()->getBlock('search.result');
+        if ($block) {
+            $block->unsetChildren();
+        }
         return $this;
     }
 }

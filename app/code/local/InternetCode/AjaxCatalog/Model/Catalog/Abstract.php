@@ -16,7 +16,7 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
     protected $_productCollection;
     protected $_state;
     /**
-     * @var string
+     * @var int|null
      */
     private $_outOfStockProducts;
 
@@ -44,28 +44,7 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
         $toolbar = $this->getToolbar();
         if ($productListBlock) {
             if(Mage::getStoreConfigFlag('catalog/frontend/split_frontend_catalog')) {
-                $select = $this->_productCollection->getSelectCountSql();
-                if (strpos($select, 'cataloginventory_stock_status') === false) {
-                    Mage::getResourceModel('cataloginventory/stock_status')
-                        ->addStockStatusToSelect(
-                            $select, Mage::app()->getWebsite()
-                        );
-                }
-                $select->where('stock_status.qty <= ?', 0);
-                $this->_outOfStockProducts = $this->_productCollection->getConnection()->fetchOne($select);
-
-
-                $showOutOfStock = (int)Mage::app()->getRequest()->getParam('out_of_stock', 0);
-                $hasStockFilter = (int)Mage::app()->getRequest()->getParam('stock', 0);
-                if (!$showOutOfStock && !$hasStockFilter) {
-                    if (strpos($this->_productCollection->getSelect(), 'cataloginventory_stock_status') === false) {
-                        Mage::getResourceModel('cataloginventory/stock_status')
-                            ->addStockStatusToSelect(
-                                $this->_productCollection->getSelect(), Mage::app()->getWebsite()
-                            );
-                    }
-                    $this->_productCollection->getSelect()->where('stock_status.qty > ?', 0);
-                }
+                $this->splitByStock();
             }
 
 
@@ -100,6 +79,27 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
 
         foreach ($this->_productCollection->getIterator() as $product) {
             $this->prepareProductOutput($product);
+        }
+    }
+
+    /**
+     * Count the unsalable products, then hide them unless requested (out_of_stock=1) or a stock filter is active.
+     *
+     * @return void
+     */
+    protected function splitByStock()
+    {
+        /** @var InternetCode_AjaxCatalog_Helper_Stock $stockHelper */
+        $stockHelper = Mage::helper('ajaxcatalog/stock');
+        $website = Mage::app()->getWebsite();
+        $request = Mage::app()->getRequest();
+
+        $this->_outOfStockProducts = $stockHelper->getOutOfStockCount($this->_productCollection, $website);
+
+        $showOutOfStock = (int)$request->getParam('out_of_stock', 0);
+        $hasStockFilter = (int)$request->getParam('stock', 0);
+        if (!$showOutOfStock && !$hasStockFilter) {
+            $stockHelper->addInStockFilter($this->_productCollection, $website);
         }
     }
 
@@ -146,6 +146,7 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
             return $this->_layerBlock;
         }
 
+        $block = null;
         foreach($this->getLayout()->getAllBlocks() as $abstractBlock){
             if($abstractBlock instanceof Mage_Catalog_Block_Layer_View){
                 $block = $abstractBlock;
@@ -224,7 +225,7 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
         $stateBlock = $layerBlock->getChild('layer_state');
         $state = [];
         /** @var Mage_Catalog_Model_Layer_Filter_Item $item */
-        foreach ($stateBlock->getActiveFilters() as $item) {
+        foreach ($stateBlock ? $stateBlock->getActiveFilters() : [] as $item) {
             $state[$item->getFilter()->getRequestVar()]['title'] = $item->getFilter()->getName();
             $state[$item->getFilter()->getRequestVar()]['param'] = $item->getFilter()->getRequestVar();
             $state[$item->getFilter()->getRequestVar()]['options'][] = [
@@ -232,17 +233,6 @@ abstract class InternetCode_AjaxCatalog_Model_Catalog_Abstract extends InternetC
                 'value' => (string) $item->getValue(),
                 'url' => $item->getRemoveUrl()
             ];
-
-            /**
-             * Special handling for slider filter (ex. price) so that it doesn't show up as filter on frontend
-             * todo Mage_Catalog_Model_Resource_Product_Collection::_prepareStatisticsData()
-             * todo min/max is getting updated with current collection min/max.
-             */
-            if (isset($filters[$item->getFilter()->getRequestVar()])
-                && $filters[$item->getFilter()->getRequestVar()]['renderer'] == 'slider'
-            ) {
-                //unset($filters[$item->getFilter()->getRequestVar()]);
-            }
         }
 
         $res = new Varien_Object([

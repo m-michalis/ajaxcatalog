@@ -3,15 +3,31 @@ include_once Mage::getModuleDir('controllers', 'Mage_Checkout') . DS . 'CartCont
 
 class InternetCode_AjaxCatalog_CartController extends Mage_Checkout_CartController
 {
+    /**
+     * Only these actions are served here; the inherited core cart actions stay on checkout/cart.
+     */
+    const ALLOWED_ACTIONS = ['add', 'data'];
+
+    public function preDispatch()
+    {
+        if (!in_array($this->getRequest()->getActionName(), self::ALLOWED_ACTIONS, true)) {
+            $this->setFlag('', self::FLAG_NO_DISPATCH, true);
+            $this->getResponse()->setHttpResponseCode(404);
+            return $this;
+        }
+
+        return parent::preDispatch();
+    }
 
     public function dataAction()
     {
         $this->loadLayout();
         $minicart = $this->getLayout()->getBlock('minicart_content');
         $this->getResponse()->setHeader('Content-type', 'application/json',true);
+        $this->getResponse()->setHeader('Cache-Control', 'private, no-store', true);
         $this->getResponse()->setBody(json_encode([
-            'content' => $minicart->toHtml(),
-            'count' => $minicart->getSummaryCount()
+            'content' => $minicart ? $minicart->toHtml() : '',
+            'count' => $minicart ? $minicart->getSummaryCount() : $this->_getCart()->getSummaryQty()
         ], JSON_HEX_TAG));
     }
 
@@ -20,7 +36,7 @@ class InternetCode_AjaxCatalog_CartController extends Mage_Checkout_CartControll
     {
         try {
             if (!$this->_validateFormKey()) {
-                Mage::throwException('Invalid form key');
+                Mage::throwException($this->__('Invalid form key. Please refresh the page.'));
             }
             $result = [];
             $cart = $this->_getCart();
@@ -34,26 +50,17 @@ class InternetCode_AjaxCatalog_CartController extends Mage_Checkout_CartControll
             }
 
             $product = $this->_initProduct();
-            $related = $this->getRequest()->getParam('related_product');
             if (!$product) {
-                Mage::throwException('Product not found');
+                Mage::throwException($this->__('Product not found.'));
             }
 
-            /**
-             * Check Qty Custom and show message of max qty to add
-             */
-            $stockItem = $product->getStockItem();
-            $item = $cart->getQuote()->getItemByProduct($product);
-            $qtyInCart = 0;
-            if($item){
-                $qtyInCart = $item->getQty();
-            }
-            if(!$stockItem->checkQty($params['qty']+$qtyInCart)){
-                Mage::throwException(Mage::helper('ajaxcatalog')->__('Η ποσότητα που ζητήσατε δεν είναι διαθέσιμη. Μέγιστη ποσότητα: %s',(int) $stockItem->getQty()));
-            }
+            $this->_validateStock($product, $params);
 
 
             $cart->addProduct($product, $params);
+
+
+            $related = $this->getRequest()->getParam('related_product');
             if (!empty($related)) {
                 $cart->addProductsByIds(explode(',', $related));
             }
@@ -95,6 +102,28 @@ class InternetCode_AjaxCatalog_CartController extends Mage_Checkout_CartControll
 
 
         $this->getResponse()->setHeader('Content-type', 'application/json',true);
+        $this->getResponse()->setHeader('Cache-Control', 'private, no-store', true);
         $this->getResponse()->setBody(Mage::helper('core')->jsonEncode($result));
+    }
+
+    /**
+     * Show how many more can be added, instead of core's generic "not available" message.
+     *
+     * @throws Mage_Core_Exception
+     */
+    protected function _validateStock(Mage_Catalog_Model_Product $product, array $params)
+    {
+        /** @var InternetCode_AjaxCatalog_Helper_Data $helper */
+        $helper = Mage::helper('ajaxcatalog');
+        $quote = $this->_getCart()->getQuote();
+
+        $item = $quote->getItemByProduct($product);
+        $qtyInCart = $item ? (float) $item->getQty() : 0.0;
+        $requestedQty = $helper->getRequestedQty($product, $params, $quote->hasProductId($product->getId()));
+
+        $message = $helper->getUnavailableQtyMessage($product, $qtyInCart, $requestedQty);
+        if ($message !== null) {
+            Mage::throwException($message);
+        }
     }
 }

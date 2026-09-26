@@ -22,6 +22,7 @@ class InternetCode_AjaxCatalog_Block_Webpack extends Mage_Core_Block_Abstract
     {
         $this->_filesByRoute = $this->helper('ajaxcatalog')->getWebpackFilesByRoute();
         $this->_handles = Mage::app()->getLayout()->getUpdate()->getHandles();
+        return parent::_prepareLayout();
     }
 
 
@@ -43,8 +44,10 @@ class InternetCode_AjaxCatalog_Block_Webpack extends Mage_Core_Block_Abstract
             $filesToLoad = array_unique(array_merge($this->_filesByRoute[$route][$this->getAssetType()] ?? [], $filesToLoad));
         }
 
+        /** @var InternetCode_AjaxCatalog_Model_Assets $assets */
+        $assets = Mage::getSingleton('ajaxcatalog/assets');
         foreach ($filesToLoad as $file) {
-            $src = Mage::getBaseUrl() . 'assets' . DS . $file;
+            $src = $this->escapeHtml($assets->getUrl($file));
 
             switch ($this->getAssetType()) {
                 case self::ASSET_JS:

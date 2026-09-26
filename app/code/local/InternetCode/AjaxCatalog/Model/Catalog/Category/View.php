@@ -9,7 +9,10 @@ class InternetCode_AjaxCatalog_Model_Catalog_Category_View extends InternetCode_
 
     public function prepareNormalView()
     {
-        $this->getLayout()->getBlock('category.products')->unsetChildren();
+        $block = $this->getLayout()->getBlock('category.products');
+        if ($block) {
+            $block->unsetChildren();
+        }
         return $this;
     }
 

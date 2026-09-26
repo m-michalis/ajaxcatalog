@@ -3,9 +3,23 @@
 
 class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
 {
+    /**
+     * Shared secret for the critical css endpoint outside developer mode (set it in app/etc/local.xml)
+     */
+    const XML_PATH_CRITICAL_TOKEN = 'global/ajaxcatalog/critical_token';
+    const CRITICAL_TOKEN_HEADER = 'X-Ajaxcatalog-Token';
+
+    /**
+     * @var array<string, string[]>|null
+     */
+    private static $_entries;
 
     public static function getEntries()
     {
+        if (self::$_entries !== null) {
+            return self::$_entries;
+        }
+
         $ajaxRoutesConfig = Mage::getConfig()->getNode(Mage_Core_Model_App_Area::AREA_FRONTEND)->ajaxentries;
         $entries = [];
 
@@ -14,7 +28,7 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
                 $entries[$entry][] = $handle;
             }
         }
-        return $entries;
+        return self::$_entries = $entries;
     }
     public static function getCriticalEntries()
     {
@@ -42,7 +56,7 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
      */
     public function prepareProductOutput(
         Mage_Catalog_Model_Product          $_product,
-        Mage_Catalog_Block_Product_Abstract $block = null
+        ?Mage_Catalog_Block_Product_Abstract $block = null
     )
     {
 
@@ -58,13 +72,13 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
         $extraData['price_html'] = $block->getPriceHtml($_product, true);
 
 
-        $extraData['add_to_card_url'] = $block->getAddToCartUrlCustom($_product, [], true);
+        $extraData['add_to_cart_url'] = $block->getAddToCartUrlCustom($_product, [], true);
+        // misspelled key kept for frontends that still read it
+        $extraData['add_to_card_url'] = $extraData['add_to_cart_url'];
 
 
-        $newsFrom = $_product->getNewsFromDate();
-        $newsTo = $_product->getNewsToDate();
-        $extraData['is_new'] = date("Y-m-d H:m:s") >= $newsFrom && date("Y-m-d H:m:s") <= $newsTo;
-        $extraData['is_sale'] = round((((float)$_product->getPrice() - (float)$_product->getFinalPrice()) / (float)$_product->getPrice()) * 100);
+        $extraData['is_new'] = $this->isProductNew($_product);
+        $extraData['is_sale'] = $this->getDiscountPercent((float)$_product->getPrice(), (float)$_product->getFinalPrice());
 
         $extraData['product_url'] = $_product->getProductUrl();
 
@@ -81,97 +95,127 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
         $_product->setData(array_merge($productData, $extraDataObj->getData()));
     }
 
+    /**
+     * Discount of the final price against the regular price, in whole percent.
+     *
+     * @param float $price
+     * @param float $finalPrice
+     * @return int
+     */
+    public function getDiscountPercent($price, $finalPrice)
+    {
+        // grouped products and dynamic-price bundles have no own price
+        if ($price <= 0) {
+            return 0;
+        }
+
+        return max(0, (int) round(($price - $finalPrice) / $price * 100));
+    }
+
+    /**
+     * Whether today (store timezone) is within news_from_date..news_to_date; either end may be open.
+     *
+     * @param Mage_Catalog_Model_Product $product
+     * @param Mage_Core_Model_Store|int|null $store
+     * @return bool
+     */
+    public function isProductNew(Mage_Catalog_Model_Product $product, $store = null)
+    {
+        $from = $product->getNewsFromDate();
+        $to = $product->getNewsToDate();
+        if (is_empty_date($from) && is_empty_date($to)) {
+            return false;
+        }
+
+        return Mage::app()->getLocale()->isStoreDateInInterval($store, $from, $to);
+    }
+
+    /**
+     * Quantity that Mage_Checkout_Model_Cart::addProduct() will add for these request params.
+     *
+     * @param Mage_Catalog_Model_Product $product
+     * @param array $params
+     * @param bool $isInCart
+     * @return float
+     */
+    public function getRequestedQty(Mage_Catalog_Model_Product $product, array $params, $isInCart)
+    {
+        $qty = isset($params['qty']) ? (float) $params['qty'] : 0.0;
+        if ($qty <= 0) {
+            $qty = (float) Mage::helper('catalog/product')->getDefaultQty($product);
+        }
+
+        $stockItem = $product->getStockItem();
+        if (!$isInCart && !$product->isConfigurable() && $stockItem) {
+            $qty = max($qty, (float) $stockItem->getMinSaleQty());
+        }
+
+        return $qty;
+    }
+
+    /**
+     * Customer-facing message when cart qty + requested qty exceeds salable stock, null when it fits.
+     * Composite products are left to core, which validates their children.
+     *
+     * @param Mage_Catalog_Model_Product $product
+     * @param float $qtyInCart
+     * @param float $requestedQty
+     * @return string|null
+     */
+    public function getUnavailableQtyMessage(Mage_Catalog_Model_Product $product, $qtyInCart, $requestedQty)
+    {
+        $stockItem = $product->getStockItem();
+        if (!$stockItem || !Mage::helper('cataloginventory')->isQty($product->getTypeId())) {
+            return null;
+        }
+        if ($stockItem->checkQty($qtyInCart + $requestedQty)) {
+            return null;
+        }
+
+        $maxQty = max(0, $stockItem->getQty() - $stockItem->getMinQty() - $qtyInCart);
+
+        return $this->__('The requested quantity is not available. Maximum quantity you can add: %s', $maxQty * 1);
+    }
+
+    /**
+     * Routes answer with HTML or JSON on the same URL, so caches must key on X-Requested-With;
+     * the JSON embeds the session form key and must not be stored at all.
+     *
+     * @param Mage_Core_Controller_Response_Http $response
+     * @param bool $isAjax
+     * @return void
+     */
+    public function applyResponseHeaders(Mage_Core_Controller_Response_Http $response, $isAjax)
+    {
+        $response->setHeader('Vary', 'X-Requested-With', true);
+        if ($isAjax) {
+            $response->setHeader('Cache-Control', 'private, no-store', true);
+        }
+    }
+
+    /**
+     * The critical css endpoint renders pages server-side; allow it only in developer mode
+     * (restricted by dev/restrict/allow_ips like other developer tools) or with the token configured in local.xml.
+     *
+     * @param Mage_Core_Controller_Request_Http $request
+     * @return bool
+     */
+    public function isCriticalAccessAllowed(Mage_Core_Controller_Request_Http $request)
+    {
+        if (Mage::getIsDeveloperMode()) {
+            return Mage::helper('core')->isDevAllowed();
+        }
+
+        $token = trim((string) Mage::getConfig()->getNode(self::XML_PATH_CRITICAL_TOKEN));
+        $given = (string) $request->getHeader(self::CRITICAL_TOKEN_HEADER);
+
+        return $token !== '' && hash_equals($token, $given);
+    }
+
 
     public function getWebpackFilesByRoute($inclCritical = true)
     {
-
-        $assetPath = Mage::getBaseDir() . DS . 'assets';
-        $io = new Varien_Io_File();
-        $io->checkAndCreateFolder($assetPath);
-        $io->cd($assetPath);
-        $files = $io->ls(Varien_Io_File::GREP_FILES);
-
-
-        $handleFiles = [];
-        $shared = [];
-
-        if($inclCritical) {
-            // find critical css
-            foreach ($files as $file) {
-                $parts = explode('.', $file['text']);
-                if ($parts[0] == 'critical' || $parts[0] == 'uncritical') {
-                    $handles = self::getEntries()[$parts[1]] ?? [];
-
-                    switch($parts[0]){
-                        case 'critical':
-                            $assetType =  InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL;
-                            break;
-                        case 'uncritical':
-                            $assetType =  InternetCode_AjaxCatalog_Block_Webpack::ASSET_UNCRITICAL;
-                            break;
-                        default:
-                            $assetType =  InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS;
-                    }
-
-                    foreach ($handles as $handle) {
-                        $handleFiles[$handle][$assetType][] = $file['text'];
-                    }
-                }
-            }
-        }
-
-        // find route specific files
-        foreach ($files as $file) {
-            $parts = explode('.', $file['text']);
-
-            $handles = self::getEntries()[$parts[0]] ?? [];
-
-            switch ($file['filetype']) {
-                case "css":
-                    $assetType = InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS;
-                    break;
-                case "js":
-                    $assetType = InternetCode_AjaxCatalog_Block_Webpack::ASSET_JS;
-                    break;
-                default:
-                    continue 2;
-            }
-
-            foreach ($handles as $handle) {
-                if (!isset($handleFiles[$handle][$assetType])) {
-                    $handleFiles[$handle][$assetType][] = $file['text'];
-                }
-            }
-        }
-
-        // find shared lib files
-        foreach ($files as $file) {
-            $parts = explode('.', $file['text']);
-
-            if ($parts[0] !== 'shared') {
-                continue;
-            }
-            foreach ($handleFiles as $handle => $filesByType) {
-                switch ($file['filetype']) {
-                    case "css":
-                        $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS][] = $file['text'];
-                        break;
-                    case "js":
-                        $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_JS][] = $file['text'];
-                        break;
-                }
-            }
-        }
-
-        // set normal css for uncritical css. these will be loaded after onload
-        foreach ($handleFiles as $handle => $filesByType) {
-            if(isset($filesByType[InternetCode_AjaxCatalog_Block_Webpack::ASSET_CRITICAL])){
-                $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_UNCRITICAL] = $handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS];
-                unset($handleFiles[$handle][InternetCode_AjaxCatalog_Block_Webpack::ASSET_CSS]);
-            }
-        }
-
-        return $handleFiles;
+        return $this->_getAssets()->getFilesByRoute($inclCritical);
     }
 
     /**
@@ -191,23 +235,14 @@ class InternetCode_AjaxCatalog_Helper_Data extends Mage_Core_Helper_Abstract
      */
     public function getImageAssetUrl(string $imagePath)
     {
-        $assetPath = 'assets' . DS . 'media' . DS . ltrim($imagePath, '/');;
-        $reqFileInfo = pathinfo($assetPath);
-        $io = new Varien_Io_File();
-        $io->checkAndCreateFolder(Mage::getBaseDir() . DS . $reqFileInfo['dirname']);
-        $io->cd(Mage::getBaseDir() . DS . $reqFileInfo['dirname']);
-        $files = $io->ls(Varien_Io_File::GREP_FILES);
+        return $this->_getAssets()->getImageUrl($imagePath);
+    }
 
-        foreach ($files as $file) {
-            $servFileInfo = pathinfo($file['text']);
-            $parts = explode('.', $servFileInfo['filename']);
-
-            if ($parts[0] == $reqFileInfo['filename'] && $reqFileInfo['extension'] == $servFileInfo['extension']) {
-                return Mage::getBaseUrl() . $reqFileInfo['dirname'] .DS. $file['text'];
-            }
-        }
-        return sprintf('https://dummyimage.com/1200x1200/FF0000/ffffff.png?text=MISSING%%20IMAGE:%s',
-            Mage::helper('core')->urlEncode($assetPath)
-        );
+    /**
+     * @return InternetCode_AjaxCatalog_Model_Assets
+     */
+    protected function _getAssets()
+    {
+        return Mage::getSingleton('ajaxcatalog/assets');
     }
 }

@@ -2,7 +2,7 @@
   "name": "m-michalis/ajaxcatalog",
   "type": "magento-module",
   "description": "description",
-  "version": "0.3.13",
+  "version": "0.4.0",
   "homepage": "https://github.com/m-michalis/ajaxcatalog",
   "keywords": [
     "openmage",
@@ -10,14 +10,15 @@
     "magento",
     "webpack"
   ],
-  "authors":[
+  "authors": [
     {
-      "name":"Michalis Michalis",
-      "email":"m@internetcode.gr"
+      "name": "Michalis Michalis",
+      "email": "m@internetcode.gr"
     }
   ],
   "require": {
     "php": "^7.2 || ^8.0",
-    "magento-hackathon/magento-composer-installer": "*"
+    "magento-hackathon/magento-composer-installer": "*",
+    "guzzlehttp/guzzle": "^7.0"
   }
 }

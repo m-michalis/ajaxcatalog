@@ -1,0 +1,10 @@
+# Exclude dev/test files from release archives (git archive / GitHub source downloads)
+/.ddev/           export-ignore
+/.gitignore       export-ignore
+/.gitattributes   export-ignore
+/.idea/           export-ignore
+/.phpunit.cache/  export-ignore
+/tests/           export-ignore
+phpunit.xml       export-ignore
+/.claude/         export-ignore
+CLAUDE.md         export-ignore

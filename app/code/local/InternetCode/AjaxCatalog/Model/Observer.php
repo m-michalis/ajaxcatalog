@@ -11,6 +11,15 @@ class InternetCode_AjaxCatalog_Model_Observer
     public function prepareForAjaxCatalog($event)
     {
         Varien_Profiler::start('PREPARE_AJAX_CATALOG');
+        try {
+            $this->_prepareForAjaxCatalog($event);
+        } finally {
+            Varien_Profiler::stop('PREPARE_AJAX_CATALOG');
+        }
+    }
+
+    private function _prepareForAjaxCatalog($event)
+    {
         $this->_action = $event->getAction();
 
         $module = $this->getRequest()->getModuleName();
@@ -24,7 +33,10 @@ class InternetCode_AjaxCatalog_Model_Observer
             return;
         }
 
-        if (!$this->getRequest()->isAjax()) {
+        $isAjax = $this->getRequest()->isAjax();
+        Mage::helper('ajaxcatalog')->applyResponseHeaders($this->getResponse(), $isAjax);
+
+        if (!$isAjax) {
             $ajaxModel->prepareNormalView();
             return;
         }
@@ -36,7 +48,6 @@ class InternetCode_AjaxCatalog_Model_Observer
         $this->getResponse()->setBody(Mage::helper('core')->jsonEncode($response));
         $this->getResponse()->setHeader('content-type', 'application/json',true);
         $this->getRequest()->setDispatched(true);
-        Varien_Profiler::stop('PREPARE_AJAX_CATALOG');
     }
 
     /**
