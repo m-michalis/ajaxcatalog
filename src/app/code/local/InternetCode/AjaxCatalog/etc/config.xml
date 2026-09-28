@@ -2,7 +2,7 @@
 <config>
     <modules>
         <InternetCode_AjaxCatalog>
-            <version>0.5.0</version>
+            <version>0.5.1</version>
         </InternetCode_AjaxCatalog>
     </modules>
     <global>

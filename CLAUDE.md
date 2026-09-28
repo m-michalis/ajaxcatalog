@@ -31,13 +31,10 @@ CI (`.github/workflows/ci.yml`): setup with sample data → lint → test → Cy
 
 | Skill | When to load |
 |-------|-------------|
-| `ajaxcatalog` | Any change to listings JSON, add-to-cart, stock split, webpack assets, critical css, observer |
-| `ajaxcatalog-testing` | DDEV environment, PHPUnit tests, sample data, Cypress, HTTP smoke tests, toolchain traps |
-| `om-ddev` | Template DDEV commands: setup, reset, seed, module symlinking |
-| `om-phpunit` | `AbstractTestCase`, config isolation, test organization |
-| `om-cypress` | Cypress framework, `cy.openmage.*`, page objects |
-| `om-adminhtml` | `system.xml` fields, admin UI |
-| `om-upstream-sync` | Syncing quality tooling / Cypress utils from OpenMage LTS upstream |
-| `om-module-init` | Template instantiation reference (already done for this repo) |
+| `ajaxcatalog` | Changing module code: listings JSON, add-to-cart, stock split, webpack assets, critical css, observer, public API |
+| `ajaxcatalog-testing` | Writing or running PHPUnit tests, lint gate fixes, sample-data facts, HTTP smoke tests |
+| `om-ddev` | DDEV setup/reset, sample data, seeding, module symlinking, CI pipeline |
+| `om-cypress` | Cypress specs for the JSON endpoints, vendored `cy.openmage` utils |
+| `om-upstream-sync` | Upgrading or syncing ECS/PHPStan/PHPCS/Rector/Cypress from OpenMage LTS or om-dev-template |
 
 For broader Magento 1.x / OpenMage work, also load the user-level **`openmage`** skill.

@@ -1,175 +1,69 @@
 ---
 name: om-upstream-sync
-description: "Sync quality tooling from OpenMage LTS upstream — update ECS, PHPStan, PHPCS, Rector, Cypress configs when upstream changes. Load when upgrading or auditing tooling."
+description: "ajaxcatalog tooling upgrades — sync ECS, PHPStan, PHPCS, Rector, Cypress utils from OpenMage LTS / om-dev-template; bump dev tools."
 ---
 
-# Syncing Quality Tooling from OpenMage LTS
+# Syncing Quality Tooling (OpenMage LTS / om-dev-template)
 
-When OpenMage LTS updates its code quality or Cypress configs, this module template should follow. This skill explains what to check, what to copy, and what to adapt.
+Sources: OpenMage LTS (`https://github.com/OpenMage/magento-lts`, branch `main`) for tool configs and Cypress utils; `git@github.com:m-michalis/om-dev-template.git` for the DDEV/CI/test skeleton this repo was migrated from.
 
 ## Local deviations — PRESERVE on sync
 
-Every item below is a deliberate divergence from upstream, discovered by running the toolchain. A sync that blindly copies upstream re-breaks each one silently. Check this list **before** committing a sync.
+Each one was found by running the toolchain. Blindly copying upstream or the template re-breaks it.
 
-### ECS dies with a missing Symfony Console class
-
-*Symptom*: `ddev lint` aborts with `Fatal error: Class "ECSPrefix202607\Symfony\Component\Console\Application" not found` and reports zero files analysed.
-
-*Cause*: `.php-cs-fixer.dist.php` configured the **deprecated** option `['use_nullable_type_declaration' => true]` on `NullableTypeDeclarationForDefaultNullValueFixer`. Configuring a deprecated option routes through php-cs-fixer's deprecation-notice path, which references `PhpCsFixer\Console\Application`. ECS ships a scoped bundle that vendors no `symfony/console`, so the class does not exist and the process dies before analysis.
-
-*Fix*: keep the fixer, drop the option. **Upstream OpenMage LTS still ships that option — do NOT copy it back.**
-
-### Other pinned deviations
-
-| File | Local value | Why it must survive |
+| File | Local value | Why |
 |---|---|---|
-| `composer.json` | `phpcs:test` keeps the `php -d error_reporting=24575` prefix | Suppresses deprecation noise that otherwise buries real PHPCS output |
-| `composer.json` | `rector:test` / `rector:fix` keep `--config=.rector.php` | Rector auto-discovers `rector.php`, **not** the dotfile. Without the flag the config is silently ignored and Rector runs on defaults |
-| `.phpcs.dist.xml` | `<config name="testVersion" value="8.2-"/>` | PHPCompatibility target; upstream supports older PHP |
-| `.phpcs.dist.xml` | `tests/*` excluded from `Ecg.Security` | ECG security rules flag legitimate test fixtures |
-| `.phpstan.dist.neon` | `bootstrapFiles: openmage/vendor/autoload.php` | PHPUnit lives inside `openmage/`, not at project root; without it PHPStan cannot resolve PHPUnit classes |
-| `cypress/support/openmage/_utils/test.js` | The commented module-namespace tail line | `scripts/init.sh` uncomments it during instantiation. Deleting it breaks init |
+| `.php-cs-fixer.dist.php` | `->withSets([SetList::PER_CS])` instead of `withPhpCsFixerSets(perCS30: true)` | ECS ≥13.3 turned `withPhpCsFixerSets()` into a no-arg stub → "Unknown named parameter $perCS30" fatal |
+| `.php-cs-fixer.dist.php` | `NullableTypeDeclarationForDefaultNullValueFixer` **unconfigured** | The deprecated `use_nullable_type_declaration` option routes through `PhpCsFixer\Console\Application`, which ECS's scoped bundle lacks → fatal before analysis. Upstream still ships the option |
+| `.rector.php` | skip `AbsolutizeRequireAndIncludePathRector` | Rewrites `require_once 'Mage/Checkout/controllers/CartController.php'` to a nonexistent `__DIR__` path → add-to-cart 500s |
+| `.rector.php` | skip `PreferPHPUnitThisCallRector`, `DeclareStrictTypesTestsRector`, `SafeDeclareStrictTypesRector`, `FinalizeTestCaseClassRector`, constructor-promotion/variadic rules | Fight ECS, break Mage (not strict-types safe), or break parent signatures. Rector hard-fails on skip entries that aren't registered or don't exist — verify FQCNs against `vendor/` |
+| `.phpstan.dist.neon` | `bootstrapFiles: openmage/vendor/autoload.php`, `magentoRootPath: openmage` | PHPUnit and OpenMage live in `openmage/`, not the root `vendor/` |
+| `.phpcs.dist.xml` | `testVersion 8.2-`, `tests/*` excluded from `Ecg.Security` | PHPCompatibility checks nothing without it; test/seed code echoes and exits |
+| `composer.json` scripts | `php -d error_reporting=24575` on phpcs; `--config=.rector.php` on rector | Deprecation noise; Rector ignores the dotfile without the flag |
+| `phpunit.xml` | `Seed` suite + `defaultTestSuite="Unit,Integration"` | Seeders mutate the DB; no `--` inside XML comments (PHPUnit refuses to load) |
+| `tests/bootstrap.php` | no `session.use_cookies=0`, developer mode on, sample-data guard | See `ajaxcatalog-testing` |
+| `tests/fixtures/seed/lib.php` | `PHP_SAPI !== 'cli'` → 404 | Path repo symlinks the repo into the docroot |
+| `tests/Base/AbstractTestCase.php` | `MODULE_ALIAS='ajaxcatalog'`, `CONFIG_SECTION='catalog'`, raw-row config backup | Module has no own config section; template restored inherited values as new rows |
+| `.github/workflows/ci.yml` | no template-init step, `--with-sample-data`, Cypress + Seed steps, `permissions: contents: read` | Template's init step calls the deleted `scripts/init.sh` |
+| `.github/workflows/release.yml` | tag check on unprefixed `$VERSION` via `env:` | Tags are `0.5.0`, not `v0.5.0` |
+| `cypress/support/openmage/_utils/test.js` | module namespace line commented out | No admin page object |
 
-## Upstream Source
+## What to sync vs adapt
 
-Repo: `https://github.com/OpenMage/magento-lts` (branch: `main`)
+| Upstream | Action |
+|---|---|
+| `composer.json` require-dev versions | Copy versions, then `ddev composer update` and commit `composer.lock` |
+| `.php-cs-fixer.dist.php` rules | Copy `withRules`/`withConfiguredRule`; keep our paths (`src`, `tests`), cache dir, and the deviations above |
+| `.phpstan.dist.neon` | Copy level/includes/flags; drop upstream `excludePaths`, `ignoreErrors`, baselines |
+| `.phpcs.dist.xml` | Copy `<rule>` blocks; drop upstream `<exclude-pattern>` for core legacy files |
+| `.rector.php` | Copy PHP/prepared sets and generic skips; drop `OpenMage\Rector\Migration` rules and core path skips |
+| `cypress/support/openmage/_utils/*`, `openmage.js`, `commands.js` | Copy verbatim, then re-comment the module line at the bottom of `test.js` |
+| `cypress/support/openmage/backend|frontend/*`, `cypress/e2e/*` | Don't sync — core page objects/specs; ours are in `frontend/ajaxcatalog/` |
+| om-dev-template `.ddev/commands/*`, `tests/Base/*`, `tests/fixtures/seed/*` | Diff by hand; keep the deviations above |
 
-Key upstream files:
-```
-.php-cs-fixer.dist.php      → ECS / code style rules
-.phpstan.dist.neon           → PHPStan config + baselines
-.phpcs.dist.xml              → PHPCS + ECG coding standard rules
-.rector.php                  → Rector refactoring rules
-.phpmd.dist.xml              → PHPMD (we don't use this — skip)
-composer.json                → dev dependency versions
-cypress/                     → inside the installed openmage/ (vendor copy)
-```
-
-## What to Sync vs Adapt
-
-| Upstream File | Action | Why |
-|---|---|---|
-| `composer.json` require-dev versions | **Copy versions** | Stay on same tool versions as upstream |
-| `.php-cs-fixer.dist.php` rules | **Copy rules, adapt paths** | Same code style; our paths are `src/` + `tests/` not `app/code/core` |
-| `.phpstan.dist.neon` level + extensions | **Copy level/includes, adapt paths** | Same strictness; strip upstream baselines and path exclusions |
-| `.phpcs.dist.xml` rule refs + excludes | **Copy rule config, adapt paths** | Same ECG standard; strip upstream legacy exclusions |
-| `.rector.php` prepared sets + skips | **Copy sets + generic skips, drop OpenMage\\Rector\\Migration rules** | Migration rules are upstream-internal; keep the PHP version sets and prepared sets |
-| `cypress/support/openmage/_utils/*` | **Copy verbatim** | These are the generic OpenMage test framework — must match upstream |
-| `cypress/support/openmage/backend/*` | **Ignore** | These are page configs for OpenMage core admin pages, not our module |
-
-## Step-by-Step Sync Process
-
-### 1. Check upstream changes
+## Process
 
 ```bash
-# Fetch upstream config files (no clone needed)
 UPSTREAM="https://raw.githubusercontent.com/OpenMage/magento-lts/main"
-curl -sO "$UPSTREAM/.php-cs-fixer.dist.php"
-curl -sO "$UPSTREAM/.phpstan.dist.neon"
-curl -sO "$UPSTREAM/.phpcs.dist.xml"
-curl -sO "$UPSTREAM/.rector.php"
-curl -sO "$UPSTREAM/composer.json"
+curl -s "$UPSTREAM/.php-cs-fixer.dist.php" | diff - .php-cs-fixer.dist.php
+curl -s "$UPSTREAM/.phpstan.dist.neon"     | diff - .phpstan.dist.neon
+curl -s "$UPSTREAM/.phpcs.dist.xml"        | diff - .phpcs.dist.xml
+curl -s "$UPSTREAM/.rector.php"            | diff - .rector.php
 ```
 
-Or read them directly on GitHub — the relevant sections are small.
-
-### 2. Update dev dependency versions
-
-Compare `require-dev` versions in upstream `composer.json` with ours. Update ours to match:
+Verify — all must pass before committing:
 
 ```bash
-# Key packages to check:
-# phpstan/phpstan, phpstan/phpstan-strict-rules, phpstan/phpstan-deprecation-rules
-# phpstan/phpstan-phpunit, phpstan/extension-installer
-# macopedia/phpstan-magento1
-# friendsofphp/php-cs-fixer, symplify/easy-coding-standard
-# squizlabs/php_codesniffer, magento-ecg/coding-standard
-# phpcompatibility/php-compatibility
-# rector/rector
+ddev composer update && ddev lint && ddev lint rector
+ddev test && ddev test --testsuite Seed
+ddev cypress-run
+curl -sk -X POST https://om-ajaxcatalog.ddev.site/ajaxcatalog/cart/add/product/234/   # must not be a PHP error page
 ```
-
-After updating versions: `composer update --dev`
-
-### 3. Sync ECS config (`.php-cs-fixer.dist.php`)
-
-**Copy**: All `->withRules([...])` and `->withConfiguredRule(...)` calls.
-**Adapt**: Keep `->withPaths([__DIR__ . '/src', __DIR__ . '/tests'])` — upstream scans `app/code/core`, `lib/`, `shell/`, etc.
-**Keep**: Our `->withCache(directory: __DIR__ . '/.cache/.ecs.cache')`.
-
-Gotcha: upstream may add new `PhpCsFixer\Fixer\*` classes. If ECS fails after sync, a new fixer might need a new php-cs-fixer version.
-
-### 4. Sync PHPStan config (`.phpstan.dist.neon`)
-
-**Copy**: `level`, `strictRules`, `phpVersion`, `includes` (extension neon files), and `checkFunctionNameCase` / `checkInternalClassCaseSensitivity` / `treatPhpDocTypesAsCertain` flags.
-**Adapt**: Keep our paths (`src`, `tests`), our `magentoRootPath` (`%currentWorkingDirectory%/openmage`), our `tmpDir`.
-**Drop**: All upstream `excludePaths` (those are for core legacy files), `ignoreErrors` (those are core-specific), and baselines (`_loader.php`).
-
-If upstream bumps `phpVersion.min`, consider bumping our `composer.json` PHP requirement too.
-
-### 5. Sync PHPCS config (`.phpcs.dist.xml`)
-
-**Copy**: All `<rule ref="...">` blocks and their `<exclude>` children.
-**Adapt**: Keep `<file>src/</file>` and `<file>tests/</file>` — upstream scans `app/code/core`, `lib/`, etc.
-**Drop**: All upstream `<exclude-pattern>` entries (those are for core legacy files like Mysql4, mcrypt, etc.).
-
-If ECG standard adds new rules, they'll appear in the upstream config as new `<rule>` or `<exclude>` entries.
-
-### 6. Sync Rector config (`.rector.php`)
-
-**Copy**: `->withPhpSets(...)`, `->withPreparedSets(...)`, and generic `->withSkip([...])` entries (the ones about rector behavior, not file paths).
-**Drop**: All `OpenMage\Rector\Migration` rules — those are internal to the upstream repo for renaming deprecated methods across the core. They don't apply to module code.
-**Drop**: All path-specific skips (`__DIR__ . '/app/code/core/...'`).
-**Adapt**: Keep our `->withPaths([__DIR__ . '/src', __DIR__ . '/tests'])`.
-
-If upstream changes `php81: true` to `php82: true`, update ours to match.
-
-### 7. Sync Cypress utilities
-
-The `cypress/support/openmage/_utils/` files are the **generic OpenMage test framework**. When upstream updates these, our copies should match.
-
-```bash
-# Source: installed OpenMage inside openmage/vendor/openmage/magento-lts/cypress/support/
-# Or fetch from GitHub:
-UPSTREAM="https://raw.githubusercontent.com/OpenMage/magento-lts/main/cypress/support"
-
-# Files to sync (copy verbatim):
-# openmage/_utils/admin.js
-# openmage/_utils/check.js
-# openmage/_utils/test.js     ← CAREFUL: see below
-# openmage/_utils/tools.js
-# openmage/_utils/utils.js
-# openmage/_utils/validation.js
-# openmage.js
-# commands.js
-```
-
-**CAREFUL with `test.js`**: Upstream's `test.js` ends with page namespace declarations for core admin pages (catalog, customer, sales, etc.). Our version ends with our module's namespace. After copying, restore the module-specific lines at the bottom:
-```js
-cy.openmage.test.backend.catalog = {};
-// Module page namespace — uncomment and modify for your module:
-// cy.openmage.test.backend.catalog.ajax_catalog = {};
-```
-
-**Do NOT sync**: `cypress/support/openmage/backend/*` or `cypress/e2e/*` from upstream — those are core page configs and tests, not relevant to modules.
-
-### 8. Verify after sync
-
-```bash
-ddev lint                # All quality checks pass
-ddev test                # PHPUnit still passes
-ddev cypress-run         # Cypress still passes (if applicable)
-```
-
-## When to Sync
-
-- **On OpenMage LTS minor/major release** (e.g., 20.x → 21.x)
-- **When quality tool CI fails** after upgrading a dependency
-- **Quarterly maintenance** — check if upstream bumped tool versions
-- **When starting a new module** from this template — ensure template is current first
 
 ## Gotchas
 
-- Upstream uses `vendor/bin/ecs` (ECS wraps php-cs-fixer) — never run `php-cs-fixer` binary directly
-- `macopedia/phpstan-magento1` must match your OpenMage LTS version — if you upgrade OpenMage, check for a new phpstan-magento1 release
-- The `dashbord` typo in `test.js` is intentional (matches OpenMage core URL) — don't "fix" it during sync
-- Upstream's `composer.json` has `phpunit/phpunit: ^9.6` but our template uses `^10.0` (installed dynamically by setup-openmage). This is fine — upstream supports older PHP versions
+- A tool upgrade can surface new findings: fix them (no baseline), don't suppress.
+- After `ddev lint fix` (Rector), always re-run the HTTP add-to-cart check: Rector rewrites can break runtime paths that tests don't cover.
+- `macopedia/phpstan-magento1` executes controller files through its autoloader — top-level code in controllers must not call `Mage::` methods.
+- PHPUnit comes from `setup-openmage` (`^10.0`, in `openmage/`), not from root `composer.json`.
+- Use `vendor/bin/ecs`, never the `php-cs-fixer` binary directly.

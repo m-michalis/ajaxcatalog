@@ -1,120 +1,71 @@
 ---
 name: om-ddev
-description: "OpenMage DDEV environment — setup-openmage, reset, seed, composer path repos, module symlinking. Load for any DDEV or environment task."
+description: "ajaxcatalog DDEV environment — setup-openmage, sample data, reset, seed, lint, module symlinking, CI pipeline."
 ---
 
-# OpenMage DDEV Environment
+# DDEV Environment (om-ajaxcatalog)
+
+Project `om-ajaxcatalog`, https://om-ajaxcatalog.ddev.site, admin `admin` / `veryl0ngpassw0rd`. PHP 8.2, MariaDB 11.8, Node 22, `MAGE_IS_DEVELOPER_MODE=1`.
 
 ## Gotchas
 
-### `ddev <command>`: No such file or directory
-
-*Symptom*: `ddev seed` (or any custom command) fails with `/mnt/ddev_config/commands/web/seed: No such file or directory`, even though the file exists on the host and is executable.
-
-*Cause*: `.ddev/` was deleted and recreated while the container was running, so the bind mount still points at the old, now-dangling inode.
-
-*Fix*: `ddev restart`. Nothing about the file itself is wrong.
-
-### `composer install` stalls during setup-openmage
-
-*Symptom*: non-interactive `composer install` hangs or fails inside `setup-openmage`, usually right after dependency resolution.
-
-*Cause*: a plugin is not in `allow-plugins`, and Composer's interactive consent prompt has nowhere to go.
-
-*Fix*: the `allow-plugins` list must include `cweagans/composer-patches` and `php-http/discovery` alongside `magento-hackathon/magento-composer-installer`.
-
-### General
-
-- `openmage/` is **ephemeral** — gitignored, created by `ddev setup-openmage`, destroyed by `reset-openmage --full`. Never commit anything inside it.
-- Module is symlinked via **composer path repo**, not modman CLI. The `modman` file at repo root tells `magento-composer-installer` where to put symlinks. Running `modman link` directly will NOT work.
-- DDEV config uses `om-ajaxcatalog` placeholder. Must be replaced before `ddev start` or DDEV will create a project literally named `om-ajaxcatalog`.
-- `setup-openmage` is **idempotent** — re-running it when already installed prints URLs and exits. To reinstall: `ddev reset-openmage && ddev setup-openmage`.
-- Admin credentials are **hardcoded**: `admin` / `veryl0ngpassw0rd`. Cypress config and seed scripts must match.
-- PHPUnit runs from **inside the web container** via `ddev test`, but `phpunit.xml` lives at **project root** (outside `openmage/`). The test command does `cd /var/www/html/openmage && php vendor/bin/phpunit --configuration /var/www/html/phpunit.xml`.
-- DB creds inside container are always `db`/`db`/`db`/`db` (host/user/pass/name). Use `${DDEV_PRIMARY_URL}` for URLs, never hardcode hostnames.
-- There is **no PHP and no Composer on the host**. Every PHP command runs through `ddev exec` or a `.ddev/commands/web/*` wrapper. Do not suggest `php`, `composer` or `vendor/bin/*` as host commands.
+- **No PHP/Composer on the host.** Everything PHP goes through `ddev exec`, `ddev composer` or a `.ddev/commands/web/*` wrapper. Cypress/npm run on the host.
+- **Always install with sample data**: `ddev setup-openmage --with-sample-data`. The tests assert against the Magento 1.9 catalog. The dump is imported *before* `install.php` (ordering is load-bearing); `install.php` then upgrades it.
+- **`openmage/` is ephemeral** (gitignored). Moving files under `src/` or editing `modman` leaves stale symlinks → `ddev reset-openmage --full && ddev setup-openmage --with-sample-data`.
+- **`setup-openmage` is idempotent** — when installed it just prints URLs. Reinstall: `ddev reset-openmage && ddev setup-openmage --with-sample-data`.
+- **Module is installed via composer path repo** (`../`, symlink) as `m-michalis/ajaxcatalog:@dev`; `magento-composer-installer` reads `modman` to symlink `src/app/...` into `openmage/app/...`. `modman link` is not used.
+- **The path repo symlinks the whole project into the docroot** (`openmage/vendor/m-michalis/ajaxcatalog`). Anything in the repo with a `.php` extension is web-reachable under DDEV. `tests/fixtures/seed/lib.php` refuses non-CLI SAPIs — every seed/e2e script must keep including it.
+- **Two composer roots.** Project root `vendor/` = lint tooling (`ddev composer install`, `composer.lock` committed). `openmage/vendor/` = OpenMage + PHPUnit 10 (installed by `setup-openmage`).
+- **`ddev <cmd>`: No such file or directory** after recreating `.ddev/` → `ddev restart`.
+- **Composer stalls in setup** → a plugin is missing from `allow-plugins` (needs `cweagans/composer-patches`, `php-http/discovery`).
+- **Clear cache after DB config edits:** `ddev exec "rm -rf openmage/var/cache/*"`.
+- DB inside the container: host/user/pass/name all `db`. Use `${DDEV_PRIMARY_URL}` in commands, never a hardcoded host.
+- Default currency is EUR (template default).
 
 ## Key Files
 
 | File | Purpose |
 |---|---|
-| `.ddev/config.yaml` | Project name, PHP version, DB version, web_environment |
-| `.ddev/commands/web/setup-openmage` | Install OpenMage + symlink module via composer path repo |
-| `.ddev/commands/web/reset-openmage` | Drop DB, remove local.xml, optional `--full` to nuke openmage/ |
-| `.ddev/commands/web/test` | Run PHPUnit (passthrough args via `$@`) |
-| `.ddev/commands/web/seed` | Dispatcher over `tests/fixtures/seed/*.php` |
-| `.ddev/commands/host/cypress-run` | Headless Cypress from host (auto `npm install`) |
-| `.ddev/commands/host/cypress-open` | Cypress GUI from host (auto `npm install`) |
-| `.ddev/commands/web/lint` | Run quality checks: all, ecs, phpstan, phpcs, rector, fix |
+| `.ddev/config.yaml` | Project name, PHP/DB/Node versions, env |
+| `.ddev/commands/web/setup-openmage` | Composer project + path repo, optional sample data, `install.php`, reindex |
+| `.ddev/commands/web/reset-openmage` | Drop DB + local.xml; `--full` deletes `openmage/` |
+| `.ddev/commands/web/test` | PHPUnit with root `phpunit.xml` (args passed through) |
+| `.ddev/commands/web/seed` | Dispatcher over `tests/fixtures/seed/<type>.php` |
+| `.ddev/commands/web/lint` | `all` / `ecs` / `phpstan` / `phpcs` / `rector` / `fix` |
+| `.ddev/commands/host/cypress-run`, `cypress-open` | Cypress from the host (auto `npm install`) |
+| `.github/workflows/ci.yml` | start → setup (sample data) → lint → test → Cypress → Seed suite |
+| `.github/workflows/release.yml` | Tags/releases `composer.json` version if the tag doesn't exist |
 
-## How Module Symlinking Works
+## Seeding
 
-1. `setup-openmage` creates `openmage/composer.json` via `composer init` + `composer config`
-2. Adds a **path repository** pointing to `../` (the module repo root): `composer config repositories.module '{"type":"path","url":"../","options":{"symlink":true}}'`
-3. `composer require "m-michalis/om-{module}:@dev"` installs the module
-4. `magento-hackathon/magento-composer-installer` reads the `modman` file and creates symlinks into `openmage/app/code/local/`, `openmage/app/etc/modules/`, etc.
+`ddev seed` maps each type 1:1 to `tests/fixtures/seed/<type>.php`. To add one: drop the file, add it to `VALID_TYPES` in `.ddev/commands/web/seed` (and `DEFAULT_ORDER` if plain `ddev seed` should run it).
 
-After adding new paths to `modman`, run: `ddev exec "cd /var/www/html/openmage && composer update m-michalis/om-{module} --prefer-source"`
+| Type | Creates |
+|---|---|
+| `config` | Storefront prerequisites (flatrate, checkmo, flat catalog off) + `split_frontend_catalog=0` |
+| `stores` | `qa_de`, `qa_it` store views |
+| `attributes` | `qa_supplier_code`, `qa_grade` |
+| `categories` | QA Store > QA Electronics / QA Apparel |
+| `products [n]` / `customers [n]` / `orders [n]` | `QA-` products, `qa-` customers, checkmo orders |
+| `mock` | Links `tests/fixtures/mock` into the docroot |
+| `clean` | Deletes everything prefixed `QA-`/`qa-`/`qa_` — never runs by default |
+
+Seeders are idempotent and prefix-scoped; keep the prefixes when extending. The module config path lives in `SEED_MODULE_SPLIT_CATALOG_PATH` (`lib.php`).
 
 ## Commands
 
 ```bash
-ddev start                    # Start environment
-ddev setup-openmage           # Install OpenMage + module (first time)
-ddev reset-openmage           # Reset DB only
-ddev reset-openmage --full    # Nuke openmage/ and reinstall
-ddev test                     # Run all PHPUnit tests
-ddev test --filter testFoo    # Run specific test
-ddev seed                     # Default order: config stores attributes categories products customers orders
-ddev seed products 25         # One type, optional count (products/customers/orders)
-ddev seed clean               # Delete everything the seeders created
-ddev lint                     # Run all quality checks (ECS + PHPStan + PHPCS)
-ddev lint phpstan             # Run PHPStan only
-ddev lint ecs                 # Run ECS only
-ddev lint phpcs               # Run PHPCS only
-ddev lint rector              # Rector dry run
-ddev lint fix                 # Auto-fix code style (ECS + Rector)
-ddev ssh                      # Shell into web container
-ddev exec "php shell/..."     # Run OpenMage shell script
+ddev start && ddev setup-openmage --with-sample-data
+ddev reset-openmage --full                 # nuke openmage/
+ddev composer install                      # root lint tooling
+ddev lint && ddev lint rector              # gate: all must be clean
+ddev lint fix                              # ECS + Rector auto-fix
+ddev test                                  # Unit + Integration
+ddev test --testsuite Seed                 # seeders (mutates DB)
+ddev seed / ddev seed products 25 / ddev seed clean
+ddev mysql -e "SELECT ..."
 ```
 
-## Seeding
+## Command anatomy
 
-`ddev seed` is a **dispatcher**, not a set of bash functions. Each type maps 1:1 to `tests/fixtures/seed/<type>.php`. To add one: drop the file in place, add its name to `VALID_TYPES` in `.ddev/commands/web/seed`, and to `DEFAULT_ORDER` if plain `ddev seed` should run it.
-
-| Type | What it creates |
-|---|---|
-| `config` | Module + storefront config (flatrate shipping, checkmo payment) |
-| `stores` | Extra store views (`qa_de`, `qa_it`) |
-| `attributes` | Product EAV attributes (`qa_supplier_code`, `qa_grade`) |
-| `categories` | QA Store > QA Electronics / QA Apparel |
-| `products [n]` | Simple products with stock and images (default 10) |
-| `customers [n]` | Confirmed accounts with addresses (default 3) |
-| `orders [n]` | Real quote → order via checkmo (default 2) |
-| `mock` | Links `tests/fixtures/mock` into the docroot |
-| `clean` | Deletes everything the seeders created — never runs by default |
-
-`DEFAULT_ORDER` is dependency-ordered: products need categories and an attribute set, orders need config plus products plus customers.
-
-Every seeder is **idempotent** and **prefix-scoped** — `QA-` SKUs, `qa-` emails, `qa_` codes. That is what makes `ddev seed clean` able to remove exactly what was seeded and nothing else. Keep the prefixes when you extend a seeder.
-
-## Template QA Harness
-
-`scripts/qa-instantiate.sh` instantiates this template into a throwaway DDEV project under `/tmp/opencode/` so the whole pipeline (init → lint → test → seed) can be verified for real. Template-only tooling: `scripts/init.sh` deletes it when a real module is generated.
-
-```bash
-./scripts/qa-instantiate.sh                          # fresh scratch project (om-qatest)
-./scripts/qa-instantiate.sh --module Foo --vendor Acme
-./scripts/qa-instantiate.sh --refresh                 # reuse the OpenMage install, preserving vendor/ and .ddev/
-./scripts/qa-instantiate.sh --with-sample-data
-./scripts/qa-instantiate.sh --destroy                 # tear the scratch project down
-```
-
-`--refresh` is the fast loop: it keeps the installed OpenMage, `vendor/` and `.ddev/` instead of reinstalling from scratch. Override the parent directory with `SCRATCH_ROOT`.
-
-## DDEV Command Anatomy
-
-Commands in `.ddev/commands/web/` run **inside** the web container. Commands in `.ddev/commands/host/` run on the **host machine**. All must have:
-- `#!/bin/bash` shebang
-- `## Description:` / `## Usage:` / `## Example:` DDEV headers
-- No `.sh` extension
+`.ddev/commands/web/*` run inside the web container, `.ddev/commands/host/*` on the host. Each needs a `#!/bin/bash` shebang, `## Description:` / `## Usage:` / `## Example:` headers, and no `.sh` extension.

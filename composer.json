@@ -2,7 +2,7 @@
     "name": "m-michalis/ajaxcatalog",
     "type": "magento-module",
     "license": "GPL-3.0-only",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "description": "Backend for a custom (webpack) OpenMage frontend: AJAX category/search listings, AJAX add-to-cart, webpack asset injection and critical css.",
     "homepage": "https://github.com/m-michalis/ajaxcatalog",
     "keywords": [

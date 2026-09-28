@@ -5,6 +5,12 @@ All notable changes to InternetCode_AjaxCatalog will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-09-28
+
+### Changed
+
+- Agent skills rewritten for the migrated repo: template-only skills (`om-module-init`, `om-adminhtml`) removed, `om-phpunit` merged into `ajaxcatalog-testing`, tooling deviations recorded in `om-upstream-sync`.
+
 ## [0.5.0] - 2026-09-28
 
 ### Changed
