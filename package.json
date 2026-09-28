@@ -7,6 +7,6 @@
     "cypress:open": "cypress open --config-file cypress.config.js"
   },
   "devDependencies": {
-    "cypress": "^14.0.0"
+    "cypress": "^16.1.0"
   }
 }
