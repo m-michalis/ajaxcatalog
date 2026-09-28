@@ -1,17 +1,15 @@
 #!/bin/bash
 
-## Description: Install OpenMage with sample data and mount modules
-## Usage: setup-openmage
+## Description: Install OpenMage with module (optionally with Magento 1.9 sample data)
+## Usage: setup-openmage [--with-sample-data]
 ## Example: ddev setup-openmage
+## Example: ddev setup-openmage --with-sample-data
 ## ProjectTypes: magento
 
 set -euo pipefail
 
 WEBROOT="/var/www/html/openmage"
 PROJECT_ROOT="/var/www/html"
-SAMPLE_DATA_DIR="${PROJECT_ROOT}/.ddev/.sampleData"
-SAMPLE_DATA_URL="https://github.com/Vinai/compressed-magento-sample-data/raw/master/compressed-magento-sample-data-1.9.2.4.tgz"
-SAMPLE_DATA_FILE="sample_data.tgz"
 
 DB_HOST="db"
 DB_USER="db"
@@ -22,7 +20,62 @@ ADMIN_USER="admin"
 ADMIN_PASS="veryl0ngpassw0rd"
 ADMIN_EMAIL="admin@example.com"
 
-# Check if already installed (skip DDEV-generated local.xml)
+# ── Sample data (opt-in) ──
+# Vinai's compressed Magento 1.9.2.4 sample data. The no-mp3 archive is ~26MB
+# NOTE: the archives live on the master branch; there is no 1.9.2.4 branch.
+# vs ~65MB for the full one and differs only in product audio files.
+SAMPLE_DATA_URL="https://raw.githubusercontent.com/Vinai/compressed-magento-sample-data/master/compressed-no-mp3-magento-sample-data-1.9.2.4.tgz"
+SAMPLE_DATA_DIR="${PROJECT_ROOT}/.ddev/.sampleData"
+SAMPLE_DATA_ARCHIVE="${SAMPLE_DATA_DIR}/sample-data.tgz"
+SAMPLE_DATA_ROOT="${SAMPLE_DATA_DIR}/magento-sample-data-1.9.2.4"
+
+WITH_SAMPLE_DATA=false
+for arg in "$@"; do
+    case "$arg" in
+        --with-sample-data) WITH_SAMPLE_DATA=true ;;
+        *) echo "Unknown option: $arg" >&2; exit 1 ;;
+    esac
+done
+
+# Sample data MUST be imported BEFORE install.php.
+# The dump expects a pristine database and creates the catalog tables itself;
+# install.php then builds the rest of the schema and the admin user around it.
+# Importing afterwards conflicts with the tables install.php has already made.
+# (Same ordering OpenMage's own .ddev/commands/web/openmage-install uses.)
+install_sample_data() {
+    echo "  Fetching Magento 1.9.2.4 sample data..."
+    mkdir -p "${SAMPLE_DATA_DIR}"
+
+    if [ ! -f "${SAMPLE_DATA_ARCHIVE}" ]; then
+        curl -fL --retry 3 -o "${SAMPLE_DATA_ARCHIVE}" "${SAMPLE_DATA_URL}"
+    else
+        echo "  Using cached archive."
+    fi
+
+    if [ ! -d "${SAMPLE_DATA_ROOT}" ]; then
+        tar -xzf "${SAMPLE_DATA_ARCHIVE}" -C "${SAMPLE_DATA_DIR}"
+    fi
+
+    echo "  Copying media and skin..."
+    mkdir -p "${WEBROOT}/media" "${WEBROOT}/skin"
+    cp -a "${SAMPLE_DATA_ROOT}/media/." "${WEBROOT}/media/" 2>/dev/null || true
+    cp -a "${SAMPLE_DATA_ROOT}/skin/." "${WEBROOT}/skin/" 2>/dev/null || true
+
+    # Defensive: ROW_FORMAT=FIXED is invalid for InnoDB and aborts the import on
+    # modern MariaDB. The 1.9.2.4 no-mp3 dump happens to contain 0 occurrences
+    # (verified), but other Vinai archives do, so the rewrite stays.
+    echo "  Importing sample data SQL (MariaDB-compatible)..."
+    sed -E 's/[[:space:]]+ROW_FORMAT=FIXED//g' \
+        "${SAMPLE_DATA_ROOT}/magento_sample_data_for_1.9.2.4.sql" \
+        > "${SAMPLE_DATA_DIR}/sample-data.compat.sql"
+
+    mysql -h "${DB_HOST}" -u "${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" \
+        < "${SAMPLE_DATA_DIR}/sample-data.compat.sql"
+
+    echo "  Sample data imported."
+}
+
+# ── Idempotency guard ──
 if [ -f "${WEBROOT}/app/etc/local.xml" ]; then
     if ! grep -q "ddev-generated" "${WEBROOT}/app/etc/local.xml" 2>/dev/null; then
         echo "OpenMage is already installed."
@@ -34,15 +87,19 @@ if [ -f "${WEBROOT}/app/etc/local.xml" ]; then
     fi
 fi
 
-echo "=== Setting up OpenMage ==="
+if [ "$WITH_SAMPLE_DATA" = true ]; then
+    echo "=== Setting up OpenMage (with Magento 1.9 sample data) ==="
+else
+    echo "=== Setting up OpenMage (empty instance, no sample data) ==="
+fi
 
-# --- 1. Composer project ---
+# ── 1. Composer project ──
 cd "${WEBROOT}"
 
 if [ ! -f "composer.json" ]; then
-    echo "[1/6] Initializing Composer project..."
+    echo "[1/5] Initializing Composer project..."
     composer init \
-        --name "internetcode/ajaxcatalog-dev" \
+        --name "internetcode/openmage-dev-instance" \
         --type "project" \
         --license "proprietary" \
         --stability "dev" \
@@ -58,65 +115,45 @@ if [ ! -f "composer.json" ]; then
     composer config allow-plugins.magento-hackathon/magento-composer-installer true
     composer config allow-plugins.aydin-hassan/magento-core-composer-installer true
     composer config allow-plugins.openmage/composer-plugin true
+    # Transitive dependencies of openmage/magento-lts ship Composer plugins.
+    # Without these the non-interactive install stalls on a trust prompt.
     composer config allow-plugins.cweagans/composer-patches true
+    composer config allow-plugins.php-http/discovery true
 
-    # Path repositories for local modules
-    composer config repositories.ajaxcatalog '{"type":"path","url":"../","options":{"symlink":true}}'
+    # Path repository for the module (../ is relative to openmage/)
+    composer config repositories.module '{"type":"path","url":"../","options":{"symlink":true}}'
 
-    # Require packages
     composer require --no-update \
         "aydin-hassan/magento-core-composer-installer:^2.1.0" \
         "openmage/magento-lts:^20.0" \
         "m-michalis/ajaxcatalog:@dev"
 else
-    echo "[1/6] Composer project already initialized."
+    echo "[1/5] Composer project already initialized."
 fi
 
-# --- 2. Install dependencies ---
-echo "[2/6] Installing Composer dependencies..."
+# ── 2. Install dependencies ──
+echo "[2/5] Installing Composer dependencies..."
 composer install --prefer-dist --no-progress
 composer require --dev phpunit/phpunit:^10.0 --no-progress 2>/dev/null || true
 
-# --- 3. Sample data ---
-echo "[3/6] Preparing sample data..."
-mkdir -p "${SAMPLE_DATA_DIR}"
-
-if [ ! -f "${SAMPLE_DATA_DIR}/${SAMPLE_DATA_FILE}" ]; then
-    echo "  Downloading sample data (~65 MB)..."
-    curl -sL "${SAMPLE_DATA_URL}" -o "${SAMPLE_DATA_DIR}/${SAMPLE_DATA_FILE}"
-else
-    echo "  Using cached sample data."
-fi
-
-TEMP_DIR=$(mktemp -d)
-tar xf "${SAMPLE_DATA_DIR}/${SAMPLE_DATA_FILE}" -C "${TEMP_DIR}"
-SAMPLE_DIR=$(find "${TEMP_DIR}" -maxdepth 1 -type d -name "magento-sample-data*" | head -1)
-
-if [ -z "${SAMPLE_DIR}" ]; then
-    echo "ERROR: Could not find sample data directory in archive."
-    rm -rf "${TEMP_DIR}"
-    exit 1
-fi
-
-echo "  Copying media and skin files..."
-mkdir -p "${WEBROOT}/media" "${WEBROOT}/skin"
-cp -r "${SAMPLE_DIR}/media/"* "${WEBROOT}/media/" 2>/dev/null || true
-cp -r "${SAMPLE_DIR}/skin/"* "${WEBROOT}/skin/" 2>/dev/null || true
-
-SAMPLE_SQL=$(find "${SAMPLE_DIR}" -name "*.sql" | head -1)
-
-# --- 4. Remove DDEV-generated local.xml (install.php needs clean slate) ---
+# ── 3. Remove DDEV-generated local.xml ──
 if grep -q "ddev-generated" "${WEBROOT}/app/etc/local.xml" 2>/dev/null; then
     rm -f "${WEBROOT}/app/etc/local.xml"
 fi
 
-# --- 5. Install OpenMage ---
-echo "[4/6] Running OpenMage installer..."
+# ── 3b. Sample data, BEFORE install.php (ordering is load-bearing) ──
+if [ "$WITH_SAMPLE_DATA" = true ]; then
+    echo "[2b/5] Installing sample data..."
+    install_sample_data
+fi
+
+# ── 4. Install OpenMage ──
+echo "[3/5] Running OpenMage installer..."
 php -f "${WEBROOT}/install.php" -- \
     --license_agreement_accepted 'yes' \
     --locale 'en_US' \
     --timezone 'UTC' \
-    --default_currency 'USD' \
+    --default_currency 'EUR' \
     --db_host "${DB_HOST}" \
     --db_name "${DB_NAME}" \
     --db_user "${DB_USER}" \
@@ -138,40 +175,14 @@ php -f "${WEBROOT}/install.php" -- \
     --enable_charts 'yes' \
     --skip_url_validation 'yes'
 
-# --- 6. Import sample data SQL ---
-if [ -n "${SAMPLE_SQL:-}" ]; then
-    echo "[5/6] Importing sample data SQL..."
-    # keep OpenMage's setup versions, or the 1.9 ones from the dump re-run upgrades against existing tables
-    mysqldump -h "${DB_HOST}" -u "${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" core_resource > /tmp/core_resource.sql
-    mysql -h "${DB_HOST}" -u "${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < "${SAMPLE_SQL}"
-    mysql -h "${DB_HOST}" -u "${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" < /tmp/core_resource.sql
-    rm -f /tmp/core_resource.sql
-else
-    echo "[5/6] No sample data SQL found, skipping."
-fi
-
-rm -rf "${TEMP_DIR}"
-
-# The 1.9 sample data SQL replaces catalog tables with their 1.9 schema; restore columns OpenMage relies on
-mysql -h "${DB_HOST}" -u "${DB_USER}" -p"${DB_PASS}" "${DB_NAME}" -e "
-    ALTER TABLE catalog_product_entity_group_price
-        ADD COLUMN IF NOT EXISTS is_percent smallint unsigned NOT NULL DEFAULT 0 COMMENT 'Is Percent';
-    REPLACE INTO core_config_data (scope, scope_id, path, value) VALUES
-        ('default', 0, 'web/unsecure/base_url', '${DDEV_PRIMARY_URL}/'),
-        ('default', 0, 'web/secure/base_url', '${DDEV_PRIMARY_URL}/'),
-        ('default', 0, 'web/secure/use_in_frontend', '1'),
-        ('default', 0, 'web/secure/use_in_adminhtml', '1');"
-
-# --- 7. Reindex ---
-echo "[6/7] Reindexing..."
-php -f "${WEBROOT}/shell/indexer.php" reindexall 2>/dev/null || true
-
-# --- 8. Finalize ---
-echo "[7/7] Finalizing..."
-mkdir -p "${WEBROOT}/var/export"
+# ── 5. Finalize ──
+echo "[4/5] Finalizing..."
+mkdir -p "${WEBROOT}/var/export" "${WEBROOT}/media"
 chmod -R g+w "${WEBROOT}/var" "${WEBROOT}/media" 2>/dev/null || true
-
 rm -rf "${WEBROOT}/var/cache/"*
+
+echo "[5/5] Reindexing and clearing cache..."
+php -f "${WEBROOT}/shell/indexer.php" reindexall 2>/dev/null || true
 
 php -r "
 require '${WEBROOT}/app/Mage.php';
@@ -183,4 +194,3 @@ echo "=== Setup Complete ==="
 echo "Frontend: ${DDEV_PRIMARY_URL}"
 echo "Admin:    ${DDEV_PRIMARY_URL}/admin"
 echo "Login:    ${ADMIN_USER} / ${ADMIN_PASS}"
-echo ""

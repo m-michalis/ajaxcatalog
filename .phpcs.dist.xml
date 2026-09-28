@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<!--
+    PHPCS configuration — ECG Magento coding standard.
+
+    Matches the OpenMage LTS upstream standard with relaxed rules
+    appropriate for a new module (no legacy exclusions needed).
+
+    Run: composer run phpcs:test
+-->
+<ruleset name="OpenMage Module">
+    <file>src/</file>
+    <file>tests/</file>
+
+    <!--
+        Target PHP version for the PHPCompatibility sniffs below.
+        WITHOUT this, PHPCompatibility silently checks nothing at all.
+        Keep in sync with composer.json "php" and .ddev/config.yaml php_version.
+    -->
+    <config name="testVersion" value="8.2-"/>
+
+    <!-- ECG Magento coding standard -->
+    <rule ref="Ecg" />
+    <rule ref="Ecg.Classes.ObjectInstantiation">
+        <exclude name="Ecg.Classes.ObjectInstantiation.DirectInstantiation"/>
+    </rule>
+    <rule ref="Ecg.Performance">
+        <!-- These are advisory — uncomment to enforce as the module matures -->
+        <exclude name="Ecg.Performance.CollectionCount.Found"/>
+        <exclude name="Ecg.Performance.GetFirstItem.Found"/>
+        <exclude name="Ecg.Performance.FetchAll.Found"/>
+        <exclude name="Ecg.Performance.Loop.DataLoad"/>
+        <exclude name="Ecg.Performance.Loop.ModelLSD"/>
+    </rule>
+    <rule ref="Ecg.PHP">
+        <exclude name="Ecg.PHP.PrivateClassMember.PrivateClassMemberError"/>
+    </rule>
+    <rule ref="Ecg.Security">
+        <exclude name="Ecg.Security.LanguageConstruct.DirectOutput"/>
+        <exclude name="Ecg.Security.LanguageConstruct.ExitUsage"/>
+        <!-- Test and seed code legitimately echoes progress and exits with status codes. -->
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+
+    <!-- PHP version compatibility checks -->
+    <rule ref="PHPCompatibility" />
+
+    <!-- Generic code analysis -->
+    <rule ref="Generic.CodeAnalysis">
+        <exclude name="Generic.CodeAnalysis.UnusedFunctionParameter"/>
+    </rule>
+
+    <!-- Exclude data/sql migration scripts from most rules (they use raw SQL) -->
+    <exclude-pattern>*/sql/*</exclude-pattern>
+    <exclude-pattern>*/data/*</exclude-pattern>
+</ruleset>

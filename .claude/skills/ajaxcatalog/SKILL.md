@@ -31,7 +31,7 @@ description: "ajaxcatalog module — AJAX listings JSON, add-to-cart, stock spli
 
 ## Where things are
 
-| Path | What |
+| Path (under `src/app/code/local/InternetCode/AjaxCatalog/`) | What |
 |------|------|
 | `Model/Observer.php` | Route → AJAX model dispatch, headers |
 | `Model/Catalog/Abstract.php` | Collection init, toolbar/layer JSON, stock split call |
@@ -41,9 +41,9 @@ description: "ajaxcatalog module — AJAX listings JSON, add-to-cart, stock spli
 | `Model/Assets.php` + `Block/Webpack.php` | Asset resolution + `<script>/<link>` output (layout `internetcode_ajaxcatalog.xml`) |
 | `controllers/CartController.php` | JSON add-to-cart + minicart data |
 | `controllers/CriticalController.php` | Build-time critical css feed (Guzzle) |
-| `app/locale/el_GR/InternetCode_AjaxCatalog.csv` | Greek strings — source strings are English |
+| `src/app/locale/el_GR/InternetCode_AjaxCatalog.csv` | Greek strings — source strings are English |
 
 ## Config
 
 - `catalog/frontend/split_frontend_catalog` (system.xml) — hide unsalable products unless `?out_of_stock=1` or `?stock=`; count returned as `toolbar.out_of_stock_count`.
-- New translatable strings → add to the el_GR CSV; new files outside `app/code` → add to `modman`.
+- New translatable strings → add to the el_GR CSV; new files outside `src/app/code` → add to `modman` (paths are `src/app/...` → `app/...`).

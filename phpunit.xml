@@ -1,20 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
-         bootstrap="tests/bootstrap.php"
-         colors="true"
-         cacheDirectory=".phpunit.cache"
-         executionOrder="depends,defects"
-         failOnWarning="true"
-         failOnRisky="true">
+<phpunit
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+    bootstrap="tests/bootstrap.php"
+    colors="true"
+    cacheDirectory=".phpunit.cache"
+    failOnRisky="true"
+    failOnWarning="true"
+    executionOrder="depends,defects"
+    defaultTestSuite="Unit,Integration"
+>
     <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
         <testsuite name="Integration">
             <directory>tests/Integration</directory>
+            <exclude>tests/Integration/Seed</exclude>
+        </testsuite>
+        <!-- Runs the seeders and leaves their data behind; opt in with: ddev test (testsuite Seed). -->
+        <testsuite name="Seed">
+            <directory>tests/Integration/Seed</directory>
         </testsuite>
     </testsuites>
     <source>
         <include>
-            <directory>app/code/local/InternetCode/AjaxCatalog</directory>
+            <directory>src/app/code/local/InternetCode/AjaxCatalog</directory>
         </include>
     </source>
 </phpunit>

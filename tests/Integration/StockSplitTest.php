@@ -1,5 +1,15 @@
 <?php
 
+namespace Tests\Integration;
+
+use InternetCode_AjaxCatalog_Helper_Stock;
+use Mage;
+use Mage_Catalog_Model_Resource_Product_Collection;
+use Mage_Catalog_Model_Product_Type;
+use Mage_Core_Model_Website;
+use Varien_Db_Adapter_Interface;
+use Tests\Base\AjaxCatalogTestCase;
+
 class StockSplitTest extends AjaxCatalogTestCase
 {
     /** @var InternetCode_AjaxCatalog_Helper_Stock */
@@ -15,9 +25,9 @@ class StockSplitTest extends AjaxCatalogTestCase
     {
         // like the layer collection: only products assigned to the store's website
         $collection = Mage::getResourceModel('catalog/product_collection')
-            ->setStoreId($this->getDefaultStore()->getId())
+            ->setStoreId((int) $this->getDefaultStore()->getId())
             ->addStoreFilter($this->getDefaultStore());
-        if ($typeId) {
+        if ($typeId !== null) {
             $collection->addAttributeToFilter('type_id', $typeId);
         }
 
@@ -28,12 +38,13 @@ class StockSplitTest extends AjaxCatalogTestCase
     {
         $resource = Mage::getSingleton('core/resource');
         $read = $resource->getConnection('core_read');
+        self::assertInstanceOf(Varien_Db_Adapter_Interface::class, $read);
         $select = $read->select()
             ->from(['e' => $resource->getTableName('catalog/product')], 'COUNT(*)')
             ->join(
                 ['s' => $resource->getTableName('cataloginventory/stock_status')],
                 's.product_id = e.entity_id',
-                []
+                [],
             )
             ->where('e.type_id = ?', $typeId)
             ->where('s.website_id = ?', $this->getDefaultStore()->getWebsiteId())
@@ -42,15 +53,23 @@ class StockSplitTest extends AjaxCatalogTestCase
         return (int) $read->fetchOne($select);
     }
 
+    private function website(): Mage_Core_Model_Website
+    {
+        $website = $this->getDefaultStore()->getWebsite();
+        self::assertInstanceOf(Mage_Core_Model_Website::class, $website);
+
+        return $website;
+    }
+
     public function testInStockConfigurablesAreKept(): void
     {
         $collection = $this->collection(Mage_Catalog_Model_Product_Type::TYPE_CONFIGURABLE);
 
-        $this->helper->addInStockFilter($collection, $this->getDefaultStore()->getWebsite());
+        $this->helper->addInStockFilter($collection, $this->website());
 
         $expected = $this->countIndexed(Mage_Catalog_Model_Product_Type::TYPE_CONFIGURABLE, 1);
-        $this->assertGreaterThan(0, $expected);
-        $this->assertSame($expected, $collection->getSize());
+        self::assertGreaterThan(0, $expected);
+        self::assertSame($expected, $collection->getSize());
     }
 
     public function testOutOfStockCountUsesStockStatus(): void
@@ -58,9 +77,9 @@ class StockSplitTest extends AjaxCatalogTestCase
         $type = Mage_Catalog_Model_Product_Type::TYPE_SIMPLE;
         $collection = $this->collection($type);
 
-        $count = $this->helper->getOutOfStockCount($collection, $this->getDefaultStore()->getWebsite());
+        $count = $this->helper->getOutOfStockCount($collection, $this->website());
 
-        $this->assertSame($this->countIndexed($type, 0), $count);
+        self::assertSame($this->countIndexed($type, 0), $count);
     }
 
     public function testOutOfStockCountDoesNotAlterCollection(): void
@@ -68,9 +87,9 @@ class StockSplitTest extends AjaxCatalogTestCase
         $collection = $this->collection();
         $before = (string) $collection->getSelect();
 
-        $this->helper->getOutOfStockCount($collection, $this->getDefaultStore()->getWebsite());
+        $this->helper->getOutOfStockCount($collection, $this->website());
 
-        $this->assertSame($before, (string) $collection->getSelect());
+        self::assertSame($before, (string) $collection->getSelect());
     }
 
     public function testCoexistsWithOtherStockStatusJoins(): void
@@ -78,15 +97,15 @@ class StockSplitTest extends AjaxCatalogTestCase
         $collection = $this->collection(Mage_Catalog_Model_Product_Type::TYPE_SIMPLE);
         // core joins the same table under the "stock_status_index" alias
         Mage::getModel('cataloginventory/stock_status')->addIsInStockFilterToCollection($collection);
-        $website = $this->getDefaultStore()->getWebsite();
+        $website = $this->website();
 
         $this->helper->getOutOfStockCount($collection, $website);
         $this->helper->addInStockFilter($collection, $website);
         $this->helper->addInStockFilter($collection, $website);
 
-        $this->assertSame(
+        self::assertSame(
             $this->countIndexed(Mage_Catalog_Model_Product_Type::TYPE_SIMPLE, 1),
-            $collection->getSize()
+            $collection->getSize(),
         );
     }
 }

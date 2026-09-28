@@ -4,16 +4,16 @@ docroot: openmage
 php_version: "8.2"
 webserver_type: nginx-fpm
 xdebug_enabled: false
-additional_hostnames: []
-additional_fqdns: []
 database:
     type: mariadb
     version: "11.8"
 use_dns_when_possible: true
 composer_version: "2"
+nodejs_version: "22"
+corepack_enable: false
 web_environment:
     - MAGE_IS_DEVELOPER_MODE=1
-corepack_enable: false
+    - COMPOSER_VENDOR_PATH=/var/www/html/openmage/vendor
 hooks:
     pre-start:
         - exec-host: "mkdir -p openmage"

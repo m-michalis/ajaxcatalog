@@ -1,0 +1,114 @@
+#!/bin/bash
+
+## Description: Seed development data (config, stores, attributes, categories, products, customers, orders, mock)
+## Usage: seed [type] [args...]
+## Example: ddev seed
+## Example: ddev seed config
+## Example: ddev seed stores
+## Example: ddev seed attributes
+## Example: ddev seed categories
+## Example: ddev seed products
+## Example: ddev seed products 25
+## Example: ddev seed customers
+## Example: ddev seed customers 5
+## Example: ddev seed orders
+## Example: ddev seed orders 5
+## Example: ddev seed mock
+## Example: ddev seed clean
+## ProjectTypes: magento
+
+set -euo pipefail
+
+PROJECT_ROOT="/var/www/html"
+WEBROOT="${PROJECT_ROOT}/openmage"
+SEED_DIR="${PROJECT_ROOT}/tests/fixtures/seed"
+
+# Check OpenMage is installed
+if [ ! -f "${WEBROOT}/app/etc/local.xml" ]; then
+    echo "Error: OpenMage is not installed. Run 'ddev setup-openmage' first."
+    exit 1
+fi
+
+# Every seeder this command can dispatch to. Each name maps 1:1 to
+# tests/fixtures/seed/<name>.php — add a file, add it here.
+VALID_TYPES=(config stores attributes categories products customers orders mock clean)
+
+# What plain `ddev seed` runs, in dependency order: products need categories
+# and an attribute set, orders need config (flatrate + checkmo), products and
+# customers. `clean` is deliberately absent — deleting data is always explicit.
+DEFAULT_ORDER=(config stores attributes categories products customers orders)
+
+usage() {
+    echo ""
+    echo "Usage: ddev seed [type] [args...]"
+    echo ""
+    echo "  (no type)   run the safe default order: ${DEFAULT_ORDER[*]}"
+    echo "  all         same as no type"
+    echo ""
+    echo "  config      module + storefront config (flatrate shipping, checkmo payment)"
+    echo "  stores      extra store views (qa_de, qa_it)"
+    echo "  attributes  product EAV attributes (qa_supplier_code, qa_grade)"
+    echo "  categories  QA Store > QA Electronics / QA Apparel"
+    echo "  products    simple products with stock and images   [count, default 10]"
+    echo "  customers   confirmed accounts with addresses       [count, default 3]"
+    echo "  orders      real quote -> order via checkmo         [count, default 2]"
+    echo "  mock        link tests/fixtures/mock into the docroot"
+    echo "  clean       delete everything the seeders created (never run by default)"
+    echo ""
+    echo "Examples:"
+    echo "  ddev seed"
+    echo "  ddev seed products 25"
+    echo "  ddev seed clean"
+    echo ""
+}
+
+is_valid_type() {
+    local candidate="$1"
+    local known
+    for known in "${VALID_TYPES[@]}"; do
+        if [ "$known" = "$candidate" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+run_seeder() {
+    local type="$1"
+    shift
+    local script="${SEED_DIR}/${type}.php"
+
+    if [ ! -f "$script" ]; then
+        echo "Error: seeder not found: ${script}"
+        exit 1
+    fi
+
+    echo "--- ${type} ---"
+    php "$script" "$@"
+}
+
+TYPE="${1:-}"
+if [ -n "$TYPE" ]; then
+    shift
+fi
+
+# Mirrors `ddev test`: run from the OpenMage root so relative var/ and media/
+# paths behave exactly as they do under the web server.
+cd "$WEBROOT"
+
+echo "=== Seeding development data ==="
+
+if [ -z "$TYPE" ] || [ "$TYPE" = "all" ]; then
+    for seed_type in "${DEFAULT_ORDER[@]}"; do
+        run_seeder "$seed_type"
+    done
+elif is_valid_type "$TYPE"; then
+    run_seeder "$TYPE" "$@"
+else
+    echo "Unknown seed type: ${TYPE}"
+    echo "Available: ${VALID_TYPES[*]}"
+    usage
+    exit 1
+fi
+
+echo "=== Seeding complete ==="

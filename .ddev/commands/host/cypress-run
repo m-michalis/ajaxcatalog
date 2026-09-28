@@ -1,0 +1,14 @@
+#!/bin/bash
+
+## Description: Run Cypress E2E tests headless
+## Usage: cypress-run [flags]
+## Example: ddev cypress-run
+## Example: ddev cypress-run --spec cypress/e2e/openmage/frontend/ajaxcatalog/cart.cy.js
+
+
+if [ ! -d "node_modules" ]; then
+  echo "Installing Cypress dependencies..."
+  npm install
+fi
+
+npx cypress run --config-file cypress.config.js "$@"

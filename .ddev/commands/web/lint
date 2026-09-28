@@ -1,0 +1,63 @@
+#!/bin/bash
+
+## Description: Run all code quality checks (ECS + PHPStan + PHPCS)
+## Usage: lint [tool]
+## Example: ddev lint
+## Example: ddev lint phpstan
+## Example: ddev lint ecs
+## Example: ddev lint phpcs
+## Example: ddev lint rector
+## ProjectTypes: magento
+
+set -euo pipefail
+
+cd /var/www/html
+
+# Install dev dependencies if missing
+if [ ! -f "vendor/bin/ecs" ]; then
+    echo "Installing dev dependencies..."
+    composer install --no-interaction
+fi
+
+TOOL="${1:-all}"
+
+case "$TOOL" in
+    all)
+        echo "=== ECS (code style) ==="
+        composer run php-cs-fixer:test
+        echo ""
+        echo "=== PHPStan (static analysis) ==="
+        composer run phpstan:test
+        echo ""
+        echo "=== PHPCS (coding standard) ==="
+        composer run phpcs:test
+        echo ""
+        echo "=== All checks passed ==="
+        ;;
+    ecs|cs|style)
+        composer run php-cs-fixer:test
+        ;;
+    phpstan|stan)
+        composer run phpstan:test
+        ;;
+    phpcs|cs-sniff)
+        composer run phpcs:test
+        ;;
+    rector)
+        composer run rector:test
+        ;;
+    fix)
+        echo "=== Fixing code style ==="
+        composer run php-cs-fixer:fix
+        echo ""
+        echo "=== Fixing with Rector ==="
+        composer run rector:fix
+        echo ""
+        echo "=== Auto-fixes applied ==="
+        ;;
+    *)
+        echo "Unknown tool: $TOOL"
+        echo "Available: all, ecs, phpstan, phpcs, rector, fix"
+        exit 1
+        ;;
+esac

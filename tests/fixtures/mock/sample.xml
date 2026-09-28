@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Static fixture payload served at <base_url>/mock/sample.xml while the
+    symlink created by `ddev seed mock` exists. Mirrors sample.json so an HTTP
+    client can be exercised against both content types.
+-->
+<response>
+    <meta>
+        <source>tests/fixtures/mock/sample.xml</source>
+        <generatedBy>ddev seed mock</generatedBy>
+        <version>1.0</version>
+    </meta>
+    <status>ok</status>
+    <page>1</page>
+    <pageSize>3</pageSize>
+    <total>3</total>
+    <items>
+        <item>
+            <sku>QA-0001</sku>
+            <name>QA Alpine Router 0001</name>
+            <price currency="USD">16.99</price>
+            <qty>23</qty>
+            <colour>Black</colour>
+            <supplierCode>SUP-001</supplierCode>
+            <active>1</active>
+        </item>
+        <item>
+            <sku>QA-0002</sku>
+            <name>QA Basalt Router 0002</name>
+            <price currency="USD">23.99</price>
+            <qty>36</qty>
+            <colour>White</colour>
+            <supplierCode>SUP-002</supplierCode>
+            <active>1</active>
+        </item>
+        <item>
+            <sku>QA-0003</sku>
+            <name>QA Cobalt Router 0003</name>
+            <price currency="USD">30.99</price>
+            <qty>49</qty>
+            <colour>Slate</colour>
+            <supplierCode>SUP-003</supplierCode>
+            <active>0</active>
+        </item>
+    </items>
+    <errors/>
+</response>

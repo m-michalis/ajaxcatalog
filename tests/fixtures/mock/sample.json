@@ -1,0 +1,45 @@
+{
+    "meta": {
+        "source": "tests/fixtures/mock/sample.json",
+        "generatedBy": "ddev seed mock",
+        "version": "1.0",
+        "note": "Static fixture payload. Served at <base_url>/mock/sample.json while the seeded symlink exists."
+    },
+    "status": "ok",
+    "page": 1,
+    "pageSize": 3,
+    "total": 3,
+    "items": [
+        {
+            "sku": "QA-0001",
+            "name": "QA Alpine Router 0001",
+            "price": 16.99,
+            "currency": "USD",
+            "qty": 23,
+            "colour": "Black",
+            "supplierCode": "SUP-001",
+            "active": true
+        },
+        {
+            "sku": "QA-0002",
+            "name": "QA Basalt Router 0002",
+            "price": 23.99,
+            "currency": "USD",
+            "qty": 36,
+            "colour": "White",
+            "supplierCode": "SUP-002",
+            "active": true
+        },
+        {
+            "sku": "QA-0003",
+            "name": "QA Cobalt Router 0003",
+            "price": 30.99,
+            "currency": "USD",
+            "qty": 49,
+            "colour": "Slate",
+            "supplierCode": "SUP-003",
+            "active": false
+        }
+    ],
+    "errors": []
+}

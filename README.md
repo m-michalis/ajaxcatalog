@@ -9,14 +9,11 @@ TBA
 
 ### Composer
 
-```json
-{
-    "minimum-stability": "dev",
-    "require": {
-        "m-michalis/ajaxcatalog": "0.1.*"
-    }
-}
+```bash
+composer require m-michalis/ajaxcatalog
 ```
+
+For non-Composer installations, use the `modman` mappings (module files live under `src/`).
 
 ## Usage
 
@@ -71,13 +68,23 @@ Catalog routes answer with HTML or JSON on the same URL (JSON for XHR / `?isAjax
 `Vary: X-Requested-With`; JSON responses contain the session form key and are sent with `Cache-Control: private, no-store`.
 
 ## Development
-```bash
-ddev start
-ddev setup-openmage   # OpenMage + sample data, module symlinked
-ddev test
-```
+
+| Command | Description |
+|---|---|
+| `ddev start` | Start the DDEV environment |
+| `ddev setup-openmage --with-sample-data` | Install OpenMage + Magento 1.9 sample data, module symlinked |
+| `ddev reset-openmage [--full]` | Reset the database (`--full` deletes the install) |
+| `ddev test` | PHPUnit (Unit + Integration; needs sample data) |
+| `ddev test --testsuite Seed` | Seeder tests (leave QA data behind) |
+| `ddev lint` | ECS + PHPStan level 8 + PHPCS |
+| `ddev lint fix` | Auto-fix code style (ECS + Rector) |
+| `ddev seed [type]` | Seed QA data |
+| `ddev cypress-run` | Cypress specs for the JSON endpoints |
+
+CI runs the same steps on pushes to master/main and on pull requests.
 
 ## Compatibility
+- PHP 8.2+
 - OpenMage 20.x (the cart helper rewrite relies on OpenMage-only methods)
 
 ## Roadmap & TODOs

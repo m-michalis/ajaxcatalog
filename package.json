@@ -1,0 +1,12 @@
+{
+  "name": "om-ajaxcatalog",
+  "private": true,
+  "description": "E2E tests for InternetCode_AjaxCatalog",
+  "scripts": {
+    "cypress:run": "cypress run --config-file cypress.config.js",
+    "cypress:open": "cypress open --config-file cypress.config.js"
+  },
+  "devDependencies": {
+    "cypress": "^14.0.0"
+  }
+}

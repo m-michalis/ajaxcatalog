@@ -1,6 +1,26 @@
-.idea
+# IDE
+.idea/
 
-# DDEV ephemeral OpenMage instance
+# OpenMage install (created by ddev setup-openmage)
 /openmage/
+
+# Composer vendor
+/vendor/
+
+# Node modules (Cypress)
+/node_modules/
+
+# DDEV sample data cache
 .ddev/.sampleData/
+
+# PHPUnit cache
 /.phpunit.cache/
+
+# Quality tool caches (ECS, PHPStan, PHPCS, Rector)
+/.cache/
+
+# Generated seed assets (product images), reproducible via `ddev seed products`
+/tests/fixtures/generated/
+
+# Agent planning scratch (not part of the template)
+/.omo/

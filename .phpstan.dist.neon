@@ -1,0 +1,31 @@
+# PHPStan configuration — matches OpenMage LTS upstream (level 8).
+#
+# Run: composer run phpstan:test
+# Run: composer run phpstan:baseline   (generate baseline for pre-existing issues)
+#
+# The macopedia/phpstan-magento1 extension teaches PHPStan about Mage::getModel(),
+# Varien_Object magic methods, helpers, blocks, and resource models.
+
+includes:
+    - vendor/macopedia/phpstan-magento1/extension.neon
+    - phar://phpstan.phar/conf/bleedingEdge.neon
+
+parameters:
+    level: 8
+    checkFunctionNameCase: true
+    checkInternalClassCaseSensitivity: true
+    treatPhpDocTypesAsCertain: false
+    phpVersion:
+        min: 80200
+        max: 80499
+    strictRules:
+        allRules: true
+    tmpDir: .cache/.phpstan.cache
+    magentoRootPath: %currentWorkingDirectory%/openmage
+    # PHPUnit is installed inside openmage/ (not at project root), so tests/ is
+    # unanalysable without this autoloader. Also gives PHPStan the Composer class map.
+    bootstrapFiles:
+        - openmage/vendor/autoload.php
+    paths:
+        - src
+        - tests

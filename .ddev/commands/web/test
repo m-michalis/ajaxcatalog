@@ -1,9 +1,10 @@
 #!/bin/bash
 
-## Description: Run ajaxcatalog PHPUnit tests
+## Description: Run PHPUnit tests
 ## Usage: test [flags]
 ## Example: ddev test
-## Example: ddev test --filter=testIsSaleForZeroPrice
+## Example: ddev test --filter=testMyFeature
+## Example: ddev test --testdox
 ## ProjectTypes: magento
 
 cd /var/www/html/openmage

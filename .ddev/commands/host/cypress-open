@@ -1,0 +1,13 @@
+#!/bin/bash
+
+## Description: Open Cypress interactive test runner
+## Usage: cypress-open [flags]
+## Example: ddev cypress-open
+
+
+if [ ! -d "node_modules" ]; then
+  echo "Installing Cypress dependencies..."
+  npm install
+fi
+
+npx cypress open --config-file cypress.config.js "$@"

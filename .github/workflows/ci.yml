@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install DDEV
+        run: curl -fsSL https://ddev.com/install.sh | bash
+
+      - name: Start DDEV
+        run: ddev start -y
+
+      # The integration tests assert against the Magento 1.9 sample catalog
+      # (configurable, grouped and bundle products, stock status split).
+      - name: Set up OpenMage
+        run: ddev setup-openmage --with-sample-data
+
+      - name: Run quality gates
+        run: ddev lint
+
+      - name: Run tests
+        run: ddev test
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Run Cypress E2E
+        run: |
+          npm ci
+          npx cypress run --config-file cypress.config.js
+
+      # Last: the seeders permanently change config and add QA stores/products/orders.
+      - name: Run seed tests
+        run: ddev test --testsuite Seed
